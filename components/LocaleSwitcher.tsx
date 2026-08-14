@@ -13,7 +13,7 @@ export default function LocaleSwitcher({ locale }: { locale: string }) {
     <button
       type="button"
       onClick={() => router.push(lh(other, stripLocale(pathname)))}
-      className="border border-ink/25 px-3 py-1.5 text-xs uppercase tracking-[0.2em] transition hover:border-ink hover:bg-ink hover:text-paper"
+      className="rounded-full border border-ink/15 bg-white/70 px-3.5 py-2 text-xs font-semibold transition hover:border-brass hover:text-brass"
       aria-label={t('language')}
     >
       {other === 'ar' ? 'ع' : 'EN'}

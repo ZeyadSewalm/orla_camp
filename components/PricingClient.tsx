@@ -31,7 +31,7 @@ export default function PricingClient({
       {/* Region toggle — a switch, not a dropdown: two states, both visible */}
       <div className="mb-14 flex flex-wrap items-center gap-4">
         <span className="label mb-0">{t('regionLabel')}</span>
-        <div className="inline-flex border border-line">
+        <div className="inline-flex rounded-full border border-ink/10 bg-white p-1">
           {(['egypt', 'international'] as Region[]).map((r) => (
             <button
               key={r}
@@ -39,7 +39,7 @@ export default function PricingClient({
               onClick={() => setRegion(r)}
               aria-pressed={region === r}
               className={`px-5 py-2.5 text-xs uppercase tracking-[0.14em] transition ${
-                region === r ? 'bg-ink text-paper' : 'text-steel hover:text-ink'
+                region === r ? 'rounded-full bg-brass text-white' : 'rounded-full text-steel hover:text-ink'
               }`}
             >
               {r === 'egypt' ? t('regionEgypt') : t('regionIntl')}
@@ -48,7 +48,7 @@ export default function PricingClient({
         </div>
       </div>
 
-      <div className="grid items-start gap-px bg-line lg:grid-cols-3">
+      <div className="grid items-stretch gap-4 lg:grid-cols-3">
         {tiers.map((tier) => {
           const { currency, full, installment, count } = tierPrice(tier, region);
           const left = seatsLeft(tier);
@@ -62,29 +62,29 @@ export default function PricingClient({
             <section
               className={`group relative flex h-full flex-col p-9 ${
                 exclusive
-                  ? 'cut-corner border border-brass bg-[#17181B] text-paper lg:-my-4 lg:py-14'
-                  : 'bg-paper hover:bg-white'
+                  ? 'overflow-hidden rounded-[2rem] border border-brass bg-brass text-white lg:-my-3 lg:py-12'
+                  : 'rounded-[2rem] border border-ink/10 bg-white transition hover:-translate-y-1 hover:shadow-xl'
               }`}
             >
               {exclusive && (
                 <>
                   <span aria-hidden className="facet-field pointer-events-none absolute inset-0 text-brass" />
-                  <span className="relative mb-6 inline-flex w-fit items-center gap-2 border border-brass px-3 py-1.5 font-mono text-[0.68rem] uppercase tracking-[0.16em] text-brass">
+                  <span className="relative mb-6 inline-flex w-fit items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[0.68rem] font-semibold text-brass">
                     {t('pilotBadge')}
                   </span>
                 </>
               )}
 
               <div className="relative flex h-full flex-col">
-                <p className={`figure text-xs ${exclusive ? 'text-brass' : 'text-steel'}`}>
+                <p className={`figure text-xs ${exclusive ? 'text-white/60' : 'text-steel'}`}>
                   {String(tier.order_index).padStart(2, '0')}
                 </p>
-                <h2 className="display mt-2 text-lg">{ar ? tier.name_ar : tier.name_en}</h2>
+                <h2 className="display mt-2 text-2xl">{ar ? tier.name_ar : tier.name_en}</h2>
                 <p className={`mt-3 min-h-[3.5rem] text-sm ${exclusive ? 'text-paper/65' : 'text-steel'}`}>
                   {ar ? tier.description_ar : tier.description_en}
                 </p>
 
-                <div className={`my-8 border-t pt-6 ${exclusive ? 'border-brass/35' : 'border-ink'}`}>
+                <div className={`my-8 border-t pt-6 ${exclusive ? 'border-white/25' : 'border-ink/15'}`}>
                   {full !== null ? (
                     <>
                       <p className="display text-xl">
@@ -97,12 +97,12 @@ export default function PricingClient({
                       )}
                     </>
                   ) : (
-                    <p className="font-display text-base font-bold text-brass">{t('customPrice')}</p>
+                    <p className={`text-base font-semibold ${exclusive ? 'text-brandSun' : 'text-brass'}`}>{t('customPrice')}</p>
                   )}
 
                   {left !== null && !soldOut && (
-                    <p key={left} className="tick mt-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-brass">
-                      <span aria-hidden className="inline-block h-1.5 w-1.5 rotate-45 bg-brass" />
+                    <p key={left} className={`tick mt-4 flex items-center gap-2 text-xs font-semibold ${exclusive ? 'text-brandSun' : 'text-brass'}`}>
+                      <span aria-hidden className={`inline-block h-2 w-2 rounded-full ${exclusive ? 'bg-brandSun' : 'bg-brass'}`} />
                       {t('seatsLeft', { count: left })}
                     </p>
                   )}

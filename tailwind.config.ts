@@ -5,12 +5,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: '#101113',      // warm black — never pure #000
-        paper: '#F5F3EF',    // ivory — never pure #FFF
-        steel: '#4A5568',    // blue-grey for secondary text
-        brass: '#B08D57',    // the one accent. CTAs, PP card, small details only
-        brassInk: '#8E7044',
-        line: '#DCD8CF'      // hairline dividers
+        ink: '#1A1A1A',
+        paper: '#F5EFE6',
+        steel: '#655F59',
+        brass: '#4B40FF',
+        brassInk: '#3429E6',
+        line: '#D9D1C6',
+        brandBlue: '#2D4FFF',
+        brandGold: '#C9A327',
+        brandCoral: '#D9603C',
+        brandOrange: '#FF8D00',
+        brandSun: '#EDDD59',
+        brandRed: '#DD4124',
+        brandBrown: '#241C15'
       },
       fontFamily: {
         display: ['var(--font-display)', 'Georgia', 'serif'],
@@ -28,14 +35,14 @@ const config: Config = {
       },
       borderRadius: {
         none: '0',
-        DEFAULT: '0',
-        sm: '2px',
-        md: '2px',
-        lg: '2px',
-        xl: '2px',
-        full: '9999px' // kept only for dots and pills
+        DEFAULT: '1rem',
+        sm: '0.75rem',
+        md: '1rem',
+        lg: '1.5rem',
+        xl: '2rem',
+        full: '9999px'
       },
-      maxWidth: { content: '76rem' },
+      maxWidth: { content: '72rem' },
       letterSpacing: { widest: '0.28em' }
     }
   },

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import Logo from './Logo';
+import Logo, { Wordmark } from './Logo';
 import LocaleSwitcher from './LocaleSwitcher';
 import LogoutButton from './LogoutButton';
 import { getSessionUser } from '@/lib/supabase/server';
@@ -22,22 +22,22 @@ export default async function Header({ locale }: { locale: string }) {
   if (profile?.role === 'admin' || profile?.role === 'reviewer') links.push(['/admin', t('admin')]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-paper/85 backdrop-blur">
-      <div className="mx-auto flex max-w-content items-center gap-6 px-5 py-4">
-        <Link href={lh(locale, ``)} className="flex items-center gap-3">
-          <Logo className="h-9 w-auto" />
-          <span className="font-display text-lg font-black uppercase leading-none tracking-tight sm:text-xl">Orladent Camp</span>
+    <header className="sticky top-0 z-50 px-3 pt-3 md:px-5">
+      <div className="soft-shadow mx-auto flex max-w-content items-center gap-4 rounded-full border border-ink/10 bg-paper/90 px-4 py-2.5 backdrop-blur-xl md:px-5">
+        <Link href={lh(locale, ``)} className="flex items-center gap-2.5" aria-label="OrlaDent Camp">
+          <Logo className="h-9 w-auto text-ink" />
+          <Wordmark className="text-[0.72rem] sm:text-[0.82rem]" />
         </Link>
 
-        <nav className="ms-auto hidden items-center gap-5 text-sm md:flex">
+        <nav className="ms-auto hidden items-center gap-1 text-sm md:flex">
           {links.map(([href, label]) => (
             <Link
               key={href}
               href={lh(locale, `${href}`)}
               className={
                 href === '/admin'
-                  ? 'bg-brass px-3 py-1.5 text-xs uppercase tracking-[0.18em] text-white hover:bg-brassInk'
-                  : 'relative after:absolute after:-bottom-1 after:start-0 after:h-px after:w-0 after:bg-brass after:transition-all hover:text-brass hover:after:w-full'
+                  ? 'rounded-full bg-brass px-4 py-2 text-xs font-semibold text-white hover:bg-brassInk'
+                  : 'rounded-full px-4 py-2 transition hover:bg-white hover:text-brass'
               }
             >
               {label}
@@ -50,17 +50,16 @@ export default async function Header({ locale }: { locale: string }) {
           {profile ? (
             <LogoutButton locale={locale} label={t('logout')} />
           ) : (
-            <Link href={lh(locale, `/login`)} className="border border-ink/25 px-3 py-1.5 text-xs uppercase tracking-[0.18em] hover:border-ink">
+            <Link href={lh(locale, `/login`)} className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-white transition hover:bg-brass">
               {t('login')}
             </Link>
           )}
         </div>
       </div>
 
-      {/* mobile nav */}
-      <nav className="flex gap-4 overflow-x-auto border-t border-line px-5 py-2 text-sm md:hidden">
+      <nav className="mx-auto mt-2 flex max-w-max gap-1 overflow-x-auto rounded-full border border-ink/10 bg-paper/90 px-2 py-1.5 text-xs shadow-sm backdrop-blur md:hidden">
         {links.map(([href, label]) => (
-          <Link key={href} href={lh(locale, `${href}`)} className="whitespace-nowrap">{label}</Link>
+          <Link key={href} href={lh(locale, `${href}`)} className="whitespace-nowrap rounded-full px-3 py-1.5 hover:bg-white">{label}</Link>
         ))}
       </nav>
     </header>

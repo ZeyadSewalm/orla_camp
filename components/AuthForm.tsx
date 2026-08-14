@@ -55,7 +55,7 @@ export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; l
     }
   }
 
-  if (sent) return <p className="border border-brass bg-brass/5 p-5 text-sm">{t('verifyNotice')}</p>;
+  if (sent) return <p className="rounded-2xl border border-brass/20 bg-brass/5 p-5 text-sm">{t('verifyNotice')}</p>;
 
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !busy) submit();
@@ -91,7 +91,7 @@ export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; l
             {(['egypt', 'international'] as Region[]).map((r) => (
               <button
                 key={r} type="button" onClick={() => setRegion(r)} aria-pressed={region === r}
-                className={`px-4 py-2 text-sm ${region === r ? 'bg-ink text-paper' : 'border border-ink/25'}`}
+                className={`rounded-full px-4 py-2 text-sm transition ${region === r ? 'bg-brass text-white' : 'border border-ink/15 bg-white'}`}
               >
                 {r === 'egypt' ? 'Egypt / مصر' : 'International'}
               </button>
@@ -100,7 +100,7 @@ export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; l
         </div>
       )}
 
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      {error && <p className="rounded-2xl bg-brandRed/10 p-4 text-sm text-red-700">{error}</p>}
 
       <button
         type="button"

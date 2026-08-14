@@ -47,18 +47,20 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
 
       {/* ── 1. HERO ── */}
-      <section className="relative overflow-hidden bg-paper">
-        <span aria-hidden className="facet-field pointer-events-none absolute inset-0 text-ink" />
+      <section className="relative overflow-hidden px-3 pb-4 pt-6 md:px-5 md:pt-8">
+        <div aria-hidden className="absolute -start-10 top-12 h-32 w-32 rotate-12 bg-brandSun md:h-44 md:w-44" />
+        <div aria-hidden className="absolute -end-10 bottom-10 h-32 w-32 rounded-full bg-brandCoral md:h-40 md:w-40" />
 
-        <div className="relative mx-auto grid max-w-content items-center gap-14 px-5 pb-16 pt-16 md:grid-cols-[1.25fr_auto] md:pb-24 md:pt-24">
+        <div className="soft-shadow relative mx-auto grid max-w-[90rem] items-center gap-12 overflow-hidden rounded-[2.25rem] border border-ink/10 bg-white px-6 py-14 md:grid-cols-[1.1fr_0.9fr] md:px-12 md:py-16 lg:px-16">
+          <span aria-hidden className="facet-field pointer-events-none absolute inset-0 text-brass" />
           <div className="rise">
-            <p className="mb-8 inline-flex items-center gap-2.5 border border-ink/15 px-3 py-1.5 font-mono text-[0.68rem] uppercase tracking-[0.2em] text-steel">
-              <span aria-hidden className="inline-block h-1.5 w-1.5 rotate-45 bg-brass" />
+            <p className="mb-7 inline-flex items-center gap-2.5 rounded-full bg-paper px-4 py-2 text-xs font-semibold text-steel">
+              <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-brass" />
               {t('kicker')}
             </p>
-            <h1 className="display text-[clamp(2.2rem,5.6vw,4.2rem)]">{t('headline')}</h1>
-            <div className="rule-diagonal my-9 max-w-sm text-brass" />
-            <p className="max-w-2xl text-base leading-relaxed text-steel">{t('subhead')}</p>
+            <h1 className="display relative max-w-3xl text-[clamp(3rem,6.2vw,5rem)]">{t('headline')}</h1>
+            <div className="rule-diagonal my-7 text-brass" />
+            <p className="max-w-2xl text-lg leading-relaxed text-steel md:text-xl">{t('subhead')}</p>
 
             <div className="mt-10 flex flex-wrap items-center gap-3">
               <MagneticButton href={lh(locale, '/signup')} className="btn-brass">{t('ctaPrimary')}</MagneticButton>
@@ -66,8 +68,8 @@ export default async function Home({ params: { locale } }: { params: { locale: s
             </div>
 
             {left !== null && left > 0 && (
-              <p className="mt-8 flex items-center gap-2.5 font-mono text-xs uppercase tracking-[0.14em] text-steel">
-                <span aria-hidden className="inline-block h-1.5 w-1.5 rotate-45 bg-brass" />
+              <p className="mt-8 flex items-center gap-2.5 text-xs font-semibold text-steel">
+                <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-brass" />
                 {p('seatsLeft', { count: left })} — Production Partner
               </p>
             )}
@@ -81,37 +83,41 @@ export default async function Home({ params: { locale } }: { params: { locale: s
               That image is still available for social previews and elsewhere;
               it just no longer outranks the logo.
             */}
-            <HeroMark className="h-[26rem] w-[22rem]" />
+            <HeroMark className="h-[28rem] w-full max-w-[25rem]" />
           </div>
         </div>
       </section>
 
       {/* ── 2. THE PROBLEM — the first faceted cut ── */}
-      <section className="cut-section relative -mt-1 bg-white pb-20 pt-[max(5rem,7vw)] md:pb-24">
-        <div className="mx-auto max-w-content px-5">
-        <h2 className="display text-4xl md:text-5xl">{t('problemTitle')}</h2>
-        <p className="mt-8 max-w-3xl font-display text-2xl font-bold leading-snug md:text-3xl">{t('problem1')}</p>
+      <section className="relative mx-3 mt-1 overflow-hidden rounded-[2.25rem] bg-brandSun py-16 md:mx-5 md:py-20">
+        <div aria-hidden className="brand-grid pointer-events-none absolute inset-0 opacity-30" />
+        <div className="relative mx-auto max-w-content px-5">
+        <h2 className="display text-4xl md:text-[3.5rem]">{t('problemTitle')}</h2>
+        <p className="mt-8 max-w-3xl text-2xl font-semibold leading-snug md:text-3xl">{t('problem1')}</p>
         <div className="mt-8 grid gap-8 md:grid-cols-2">
-          <p className="leading-relaxed text-steel">{t('problem2')}</p>
-          <p className="leading-relaxed text-steel">{t('problem3')}</p>
+          <p className="leading-relaxed text-ink/70">{t('problem2')}</p>
+          <p className="leading-relaxed text-ink/70">{t('problem3')}</p>
         </div>
           <p className="mt-12 border-s-2 border-brass ps-7 font-display text-lg font-black">{t('problemClose')}</p>
         </div>
       </section>
 
       {/* ── 3. INSTRUCTOR ── */}
-      <section className="relative overflow-hidden bg-ink text-paper">
-        <div aria-hidden className="facet-field pointer-events-none absolute inset-0 text-paper/20" />
-        <div className="relative mx-auto max-w-content px-5 py-20">
-          <p className="text-xs uppercase tracking-[0.28em] text-brass">{t('instructorKicker')}</p>
+      <section className="relative mx-3 mt-4 overflow-hidden rounded-[2.25rem] bg-brass text-white md:mx-5">
+        <div aria-hidden className="facet-field pointer-events-none absolute inset-0 text-white" />
+        <div aria-hidden className="absolute -end-12 top-10 h-40 w-40 rounded-full bg-brandOrange" />
+        <div className="relative mx-auto max-w-content px-5 py-16 md:py-20">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/70">{t('instructorKicker')}</p>
           <div className="mt-6 flex flex-col gap-10 md:flex-row md:items-start">
-            <Logo className="h-32 w-auto shrink-0 text-brass" />
+            <div className="flex h-40 w-40 shrink-0 items-center justify-center rounded-full bg-white p-7 text-ink">
+              <Logo className="h-full w-auto" />
+            </div>
             <div>
               <h2 className="display text-4xl md:text-5xl">{t('instructorTitle')}</h2>
-              <div className="mt-6 max-w-3xl space-y-5 text-lg leading-relaxed text-paper/75">
+              <div className="mt-6 max-w-3xl space-y-5 text-lg leading-relaxed text-white/75">
                 <p>{t('instructor1')}</p>
                 <p>{t('instructor2')}</p>
-                <p className="text-paper">{t('instructor3')}</p>
+                <p className="text-white">{t('instructor3')}</p>
               </div>
             </div>
           </div>
@@ -119,9 +125,9 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       </section>
 
       {/* ── 4. CURRICULUM ── */}
-      <section id="curriculum" className="scroll-mt-24 border-b border-line bg-white">
+      <section id="curriculum" className="scroll-mt-24">
         <div className="mx-auto max-w-content px-5 py-20">
-          <h2 className="display text-4xl md:text-5xl">{t('curriculumTitle')}</h2>
+          <h2 className="display text-4xl md:text-[3.5rem]">{t('curriculumTitle')}</h2>
           <p className="mt-4 max-w-2xl italic text-steel">{t('curriculumNote')}</p>
           <Curriculum locale={locale} labels={{ available: t('statusAvailable'), coming: t('statusComing') }} />
           <p className="mt-12 max-w-3xl border-s-4 border-brass ps-6 italic text-steel">{t('curriculumFooter')}</p>
@@ -129,8 +135,8 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       </section>
 
       {/* ── 5. TIER COMPARISON ── */}
-      <section className="mx-auto max-w-content px-5 py-20">
-        <h2 className="display text-4xl md:text-5xl">{t('comparisonTitle')}</h2>
+      <section className="mx-auto max-w-content px-5 py-16 md:py-20">
+        <h2 className="display text-4xl md:text-[3.5rem]">{t('comparisonTitle')}</h2>
         <p className="mt-4 max-w-3xl italic text-steel">{t('comparisonNote')}</p>
         <TierComparison
           tiers={tiers}
@@ -142,7 +148,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
             installments: ar ? 'أو' : 'or'
           }}
         />
-        <p className="mt-8 max-w-3xl border border-ink/20 bg-white p-6 text-sm italic leading-relaxed text-steel">
+        <p className="surface-card mt-8 max-w-3xl p-6 text-sm leading-relaxed text-steel">
           {t('partnerNote')}
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
@@ -152,13 +158,13 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       </section>
 
       {/* ── 6. WHAT'S INCLUDED ── */}
-      <section className="border-y border-line bg-white">
-        <div className="mx-auto max-w-content px-5 py-20">
-          <h2 className="display text-4xl md:text-5xl">{t('includedTitle')}</h2>
-          <ul className="mt-10 grid gap-px bg-line md:grid-cols-2">
+      <section className="mx-3 overflow-hidden rounded-[2.25rem] bg-white md:mx-5">
+        <div className="mx-auto max-w-content px-5 py-16 md:py-20">
+          <h2 className="display text-4xl md:text-[3.5rem]">{t('includedTitle')}</h2>
+          <ul className="mt-10 grid gap-3 md:grid-cols-2">
             {included.map((line, i) => (
-              <li key={i} className="flex gap-4 bg-white p-7">
-                <span className="font-display text-sm text-brass">{String(i + 1).padStart(2, '0')}</span>
+              <li key={i} className="flex gap-4 rounded-3xl bg-paper p-7">
+                <span className="figure flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brass text-xs text-white">{String(i + 1).padStart(2, '0')}</span>
                 <span className="leading-relaxed text-steel">{line}</span>
               </li>
             ))}
@@ -177,13 +183,13 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       </section>
 
       {/* ── 8. FAQ ── */}
-      <section className="border-y border-line bg-white">
+      <section className="mx-3 overflow-hidden rounded-[2.25rem] bg-white md:mx-5">
         <div className="mx-auto max-w-content px-5 py-20">
-          <h2 className="display text-4xl md:text-5xl">{f('title')}</h2>
+          <h2 className="display text-4xl md:text-[3.5rem]">{f('title')}</h2>
           <dl className="mt-10 max-w-3xl">
             {faqs.map(([q, a]) => (
-              <div key={q} className="border-b border-line py-6">
-                <dt className="font-display text-lg font-bold">{q}</dt>
+              <div key={q} className="mb-3 rounded-3xl bg-paper p-6">
+                <dt className="text-lg font-semibold">{q}</dt>
                 <dd className="mt-2 leading-relaxed text-steel">{a}</dd>
               </div>
             ))}
@@ -193,10 +199,10 @@ export default async function Home({ params: { locale } }: { params: { locale: s
 
       {/* ── 9. FINAL CTA ── */}
       <section className="mx-auto max-w-content px-5 py-20">
-        <div className="cut-corner relative overflow-hidden bg-brass p-10 text-white md:p-16">
+        <div className="relative overflow-hidden rounded-[2.25rem] bg-brass p-10 text-white md:p-16">
           <div aria-hidden className="facet-field pointer-events-none absolute inset-0 text-white/25" />
           <div className="relative">
-            <h2 className="display text-4xl md:text-6xl">{t('finalTitle')}</h2>
+            <h2 className="display max-w-4xl text-4xl md:text-[4.5rem]">{t('finalTitle')}</h2>
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/85">{t('finalBody')}</p>
             <Link href={lh(locale, '/pricing')} className="btn-on-dark mt-9">{t('finalCta')}</Link>
           </div>

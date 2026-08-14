@@ -43,9 +43,9 @@ export async function generateMetadata({ params: { locale } }: { params: { local
     openGraph: {
       title, description, url: `${site}${lh(locale)}`, siteName: title,
       locale: locale === 'ar' ? 'ar_EG' : 'en_US',
-      images: [{ url: '/logo/orladent-lockup-vertical.svg', width: 420, height: 800, alt: title }]
+      images: [{ url: '/logo/orladent-logo.svg', width: 543, height: 937, alt: title }]
     },
-    twitter: { card: 'summary_large_image', title, description, images: ['/logo/orladent-lockup-vertical.svg'] },
+    twitter: { card: 'summary_large_image', title, description, images: ['/logo/orladent-logo.svg'] },
     icons: { icon: '/logo/orladent-logo.svg' }
   };
 }

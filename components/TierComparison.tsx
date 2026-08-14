@@ -56,10 +56,10 @@ export default function TierComparison({
   );
 
   return (
-    <div className="mt-10 overflow-x-auto">
+    <div className="surface-card mt-10 overflow-x-auto p-5 md:p-7">
       <table className="w-full min-w-[42rem] text-sm">
         <thead>
-          <tr className="border-b-2 border-ink">
+          <tr className="border-b border-ink/20">
             <th className="w-2/5 py-4 text-start" />
             {cols.map((tier) => (
               <th key={tier.id} scope="col" className="py-4 pe-4 text-start align-bottom font-display text-base font-black">

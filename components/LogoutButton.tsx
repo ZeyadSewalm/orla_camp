@@ -8,7 +8,7 @@ export default function LogoutButton({ locale, label }: { locale: string; label:
   return (
     <button
       type="button"
-      className="border border-ink/25 px-3 py-1.5 text-xs uppercase tracking-[0.18em] hover:border-ink"
+      className="rounded-full border border-ink/15 bg-white/70 px-3.5 py-2 text-xs font-semibold hover:border-brass hover:text-brass"
       onClick={async () => {
         await createClient().auth.signOut();
         router.push(lh(locale, ``));

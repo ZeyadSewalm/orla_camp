@@ -22,13 +22,14 @@ export default async function Faq({ params: { locale } }: { params: { locale: st
   };
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-16">
+    <div className="mx-auto max-w-4xl px-5 py-14 md:py-20">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
-      <h1 className="font-display text-4xl font-black">{t('title')}</h1>
-      <dl className="mt-10">
+      <h1 className="display text-5xl md:text-[4.5rem]">{t('title')}</h1>
+      <div className="rule-diagonal mt-7 text-brass" />
+      <dl className="mt-10 space-y-3">
         {items.map(([q, a]) => (
-          <div key={q} className="border-b border-line py-6">
-            <dt className="font-display text-xl font-bold">{q}</dt>
+          <div key={q} className="surface-card p-6 md:p-7">
+            <dt className="text-xl font-semibold">{q}</dt>
             <dd className="mt-2 leading-relaxed text-steel">{a}</dd>
           </div>
         ))}
