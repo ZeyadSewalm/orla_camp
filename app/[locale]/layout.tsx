@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations, unstable_setRequestLocale } from 'next-intl/server';
 import '@fontsource-variable/fraunces';
@@ -25,6 +25,26 @@ const fontVariables = {
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
+
+/**
+ * The viewport meta tag, declared explicitly.
+ *
+ * Next 14 injects a default one, but relying on that is fragile — the moment
+ * anything else defines `viewport` the default is dropped, and without it a
+ * phone renders the page at 980px wide and scales it down. Everything then
+ * looks "zoomed out and broken" no matter how good the CSS is.
+ *
+ * maximumScale is deliberately 5 and userScalable stays on: pinch-zoom is an
+ * accessibility requirement, and disabling it is a common mistake made while
+ * chasing exactly this bug.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: '#F5EFE6'
+};
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: 'home' });

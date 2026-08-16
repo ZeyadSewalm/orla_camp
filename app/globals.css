@@ -11,7 +11,18 @@
 
 html {
   max-width: 100%;
+  /*
+   * `overflow-x: hidden` on html/body is the usual reflex for stopping
+   * sideways scroll, and it is also what silently kills `position: sticky` —
+   * the sticky header stopped sticking on mobile Safari and Chrome for exactly
+   * this reason. `clip` cuts the overflow without creating a scroll container,
+   * so sticky keeps working. `hidden` is left first as a fallback for old
+   * browsers that do not know `clip`.
+   */
   overflow-x: hidden;
+  overflow-x: clip;
+  /* Stops iOS from silently inflating text in landscape. */
+  -webkit-text-size-adjust: 100%;
 }
 
 /* Arabic keeps a Kufi face for display and body; numbers stay mono. */
@@ -24,6 +35,7 @@ body {
   @apply bg-paper text-ink font-body antialiased;
   max-width: 100%;
   overflow-x: hidden;
+  overflow-x: clip;
   letter-spacing: -0.015em;
   background-image: radial-gradient(circle at 10% 0%, rgba(75, 64, 255, 0.06), transparent 22rem);
 }
@@ -198,6 +210,89 @@ html[lang='ar'] .display {
   to   { opacity: 1; transform: translateY(0); }
 }
 .tick { animation: tick 0.3s ease-out both; }
+
+/* =============================================================
+   RESPONSIVE CORRECTIONS
+   =============================================================
+   Everything below exists because the layout was designed at desktop width
+   and then met a 360-390px phone.
+   ============================================================= */
+
+/*
+ * Long words — a URL, an English technical term inside Arabic copy, an email
+ * address in the admin panel — were forcing containers wider than the screen.
+ * The page then scrolled sideways and every section looked misaligned.
+ */
+h1, h2, h3, h4, p, li, dd, dt, span, a, td, th {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Headings break far more gracefully when the browser balances the lines. */
+h1, h2, .display {
+  text-wrap: balance;
+}
+
+/*
+ * A flex or grid child defaults to min-width:auto, which means it refuses to
+ * shrink below its content. That is what makes one long word push a whole row
+ * off-screen instead of wrapping inside it.
+ */
+main :where(.flex, .grid) > * {
+  min-width: 0;
+}
+
+/* Media never exceeds its column. */
+img, svg, video, canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Tables stay readable by scrolling themselves, not the page. */
+table {
+  max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  /*
+   * iOS zooms the whole page in whenever a focused input has a font-size below
+   * 16px, and it never zooms back out. On the login and checkout forms that
+   * looked like the layout breaking on tap. 16px exactly, phones only.
+   */
+  .field,
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* Buttons were wider than a narrow phone once the label wrapped. */
+  .btn {
+    @apply px-5 py-3;
+  }
+
+  /* The oversized editorial corner radius eats the content area on a phone. */
+  .surface-card {
+    border-radius: 1.25rem;
+  }
+
+  /* Diagonal clip paths cut into text at narrow widths. */
+  .cut-section,
+  .cut-corner,
+  .cut-corner-sm {
+    clip-path: none;
+  }
+}
+
+/* Horizontal chip rows (the mobile nav) scroll without an ugly bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
 
 :focus-visible { outline: 2px solid #4B40FF; outline-offset: 3px; }
 

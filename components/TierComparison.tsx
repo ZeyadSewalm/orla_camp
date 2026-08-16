@@ -56,8 +56,12 @@ export default function TierComparison({
   );
 
   return (
-    <div className="surface-card mt-10 overflow-x-auto p-5 md:p-7">
-      <table className="w-full min-w-[42rem] text-sm">
+    // The table cannot usefully collapse below ~42rem — four columns of
+    // feature ticks stop meaning anything. So it scrolls, and the scroll is
+    // announced rather than left for the user to discover by accident.
+    <div className="mt-10">
+      <div className="surface-card no-scrollbar overflow-x-auto p-5 md:p-7">
+        <table className="w-full min-w-[42rem] text-sm">
         <thead>
           <tr className="border-b border-ink/20">
             <th className="w-2/5 py-4 text-start" />
@@ -85,7 +89,11 @@ export default function TierComparison({
           {priceRow('egypt', labels.egypt)}
           {priceRow('international', labels.intl)}
         </tbody>
-      </table>
+        </table>
+      </div>
+      <p className="mt-2 text-center text-xs text-steel md:hidden">
+        {ar ? '← اسحب الجدول لجنب عشان تشوف باقي الباقات' : 'Swipe the table sideways to see every plan →'}
+      </p>
     </div>
   );
 }

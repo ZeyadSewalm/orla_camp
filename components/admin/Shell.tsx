@@ -92,7 +92,7 @@ export function Sidebar({
 }
 
 export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`border border-line bg-white p-7 ${className}`}>{children}</div>;
+  return <div className={`border border-line bg-white p-5 sm:p-7 ${className}`}>{children}</div>;
 }
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -121,7 +121,7 @@ export function Stat({
         <p className="label mb-0">{label}</p>
         {Icon && <Icon aria-hidden className="h-4 w-4 text-brass" strokeWidth={1.75} />}
       </div>
-      <p className="figure mt-5 text-xl leading-none text-ink">{value}</p>
+      <p className="figure mt-5 text-lg leading-none text-ink sm:text-xl">{value}</p>
       {sub && <p className="mt-3 border-t border-line pt-3 text-xs text-steel">{sub}</p>}
     </div>
   );

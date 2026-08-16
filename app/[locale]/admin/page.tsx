@@ -101,7 +101,7 @@ async function Tiers({ db, save }: { db: DB; save: string }) {
             <Field label="Name (EN)"><input name="name_en" defaultValue={tier.name_en} className="field" /></Field>
             <Field label="Description (AR)"><textarea name="description_ar" rows={2} defaultValue={tier.description_ar ?? ''} className="field" /></Field>
             <Field label="Description (EN)"><textarea name="description_en" rows={2} defaultValue={tier.description_en ?? ''} className="field" /></Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 xs:grid-cols-2">
               <Field label="Price EGP"><input name="price_egp" type="number" step="1" defaultValue={tier.price_egp ?? ''} className="field" /></Field>
               <Field label="Price USD"><input name="price_usd" type="number" step="1" defaultValue={tier.price_usd ?? ''} className="field" /></Field>
               <Field label="Instalment EGP"><input name="installment_price_egp" type="number" defaultValue={tier.installment_price_egp ?? ''} className="field" /></Field>
@@ -657,7 +657,7 @@ async function Students({
         <a href={`${lh(locale, '/admin')}?tab=students`} className="text-sm text-brass underline">← {t('backToList')}</a>
 
         <Card>
-          <h2 className="font-display text-2xl font-black">{student.full_name || student.email}</h2>
+          <h2 className="font-display text-xl font-black">{student.full_name || student.email}</h2>
           <p className="mt-1 text-sm text-steel">{student.email}</p>
 
           {student.installments_total > 0 && (

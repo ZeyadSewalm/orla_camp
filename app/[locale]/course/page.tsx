@@ -60,7 +60,7 @@ export default async function Course({ params: { locale } }: { params: { locale:
         {modules.map((m, i) => (
           <article key={m.id}>
             <p className="font-display text-sm text-brass">{String(i + 1).padStart(2, '0')}</p>
-            <h2 className="mt-1 font-display text-2xl font-black">{ar ? m.title_ar : m.title_en}</h2>
+            <h2 className="mt-1 font-display text-xl font-black">{ar ? m.title_ar : m.title_en}</h2>
             <p className="mb-5 mt-2 text-sm leading-relaxed text-steel">{ar ? m.description_ar : m.description_en}</p>
 
             <VideoEmbed

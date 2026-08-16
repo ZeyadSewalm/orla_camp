@@ -60,7 +60,7 @@ export default function PricingClient({
           return (
             <TiltCard key={tier.id} className="h-full">
             <section
-              className={`group relative flex h-full flex-col p-9 ${
+              className={`group relative flex h-full flex-col p-6 sm:p-9 ${
                 exclusive
                   ? 'overflow-hidden rounded-[2rem] border border-brass bg-brass text-white lg:-my-3 lg:py-12'
                   : 'rounded-[2rem] border border-ink/10 bg-white transition hover:-translate-y-1 hover:shadow-xl'
@@ -79,15 +79,19 @@ export default function PricingClient({
                 <p className={`figure text-xs ${exclusive ? 'text-white/60' : 'text-steel'}`}>
                   {String(tier.order_index).padStart(2, '0')}
                 </p>
-                <h2 className="display mt-2 text-2xl">{ar ? tier.name_ar : tier.name_en}</h2>
-                <p className={`mt-3 min-h-[3.5rem] text-sm ${exclusive ? 'text-paper/65' : 'text-steel'}`}>
+                {/* Tier name: text-2xl was 64px, which alone overflowed the
+                    card on every phone. */}
+                <h2 className="display mt-2 text-xl">{ar ? tier.name_ar : tier.name_en}</h2>
+                {/* min-h reserved desktop space for two lines; on a phone the
+                    same copy runs to four and the fixed height clipped it. */}
+                <p className={`mt-3 text-sm md:min-h-[3.5rem] ${exclusive ? 'text-paper/65' : 'text-steel'}`}>
                   {ar ? tier.description_ar : tier.description_en}
                 </p>
 
                 <div className={`my-8 border-t pt-6 ${exclusive ? 'border-white/25' : 'border-ink/15'}`}>
                   {full !== null ? (
                     <>
-                      <p className="display text-xl">
+                      <p className="display text-lg sm:text-xl">
                         <CountUp value={full} format={(n) => formatMoney(n, currency, locale)} />
                       </p>
                       {tier.installments_available && installment && (

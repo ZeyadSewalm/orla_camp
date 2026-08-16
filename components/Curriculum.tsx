@@ -17,15 +17,16 @@ export default function Curriculum({
   return (
     <div className="mt-12 grid gap-4 md:grid-cols-2">
       {CURRICULUM.map((block) => (
-        <div key={block.en} className="surface-card p-6 md:p-7">
-          <h3 className="text-2xl font-semibold tracking-tight">{ar ? block.ar : block.en}</h3>
+        <div key={block.en} className="surface-card p-5 md:p-7">
+          {/* text-2xl is 64px here — a block title, not a hero. */}
+          <h3 className="text-xl font-semibold tracking-tight">{ar ? block.ar : block.en}</h3>
           <ul className="mt-5">
             {block.modules.map((m) => {
               const live = m.status === 'available';
               return (
                 <li
                   key={m.en}
-                  className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-ink/10 py-4 last:border-0"
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-ink/10 py-4 last:border-0 md:gap-x-6"
                 >
                   <span className={live ? 'font-medium' : 'text-steel'}>{ar ? m.ar : m.en}</span>
                   <span

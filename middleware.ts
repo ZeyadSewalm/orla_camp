@@ -1,10 +1,20 @@
 import createIntlMiddleware from 'next-intl/middleware';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { locales, defaultLocale } from './i18n';
+import { locales, defaultLocale, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from './i18n';
 import { lh } from './lib/href';
 
-const intlMiddleware = createIntlMiddleware({ locales: [...locales], defaultLocale, localePrefix: 'as-needed' });
+const intlMiddleware = createIntlMiddleware({
+  locales: [...locales],
+  defaultLocale,
+  localePrefix: 'as-needed',
+  // Detection stays ON — it is what makes an unprefixed "/pricing" mean Arabic
+  // for an Arabic visitor and English for someone who switched. The cookie is
+  // named explicitly here so LocaleSwitcher and the middleware can never drift
+  // apart; both import it from i18n.ts.
+  localeDetection: true,
+  localeCookie: { name: LOCALE_COOKIE, maxAge: LOCALE_COOKIE_MAX_AGE, sameSite: 'lax' }
+});
 
 const PROTECTED = ['/course', '/admin', '/community', '/live-sessions', '/checkout'];
 
@@ -62,6 +72,20 @@ export async function middleware(request: NextRequest) {
   };
 
   const response = intlMiddleware(request);
+
+  /**
+   * If next-intl decided this url has to move (e.g. "/en/pricing" → "/pricing"
+   * after a language switch), send that redirect NOW.
+   *
+   * Doing the Supabase work on a response that is already a 307 wastes a round
+   * trip, and worse, any auth cookie written onto a redirect can be lost. The
+   * browser follows the redirect and this middleware runs again on the real
+   * url, where the auth check happens properly.
+   */
+  if (response.status >= 300 && response.status < 400) {
+    log('intl redirect');
+    return response;
+  }
 
   const pathname = request.nextUrl.pathname;
   const locale = locales.find((l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`)) ?? defaultLocale;

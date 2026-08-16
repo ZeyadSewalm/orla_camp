@@ -23,10 +23,13 @@ export default async function Header({ locale }: { locale: string }) {
 
   return (
     <header className="sticky top-0 z-50 px-3 pt-3 md:px-5">
-      <div className="soft-shadow mx-auto flex max-w-content items-center gap-4 rounded-full border border-ink/10 bg-paper/90 px-4 py-2.5 backdrop-blur-xl md:px-5">
-        <Link href={lh(locale, ``)} className="flex items-center gap-2.5" aria-label="OrlaDent Camp">
-          <Logo className="h-9 w-auto text-ink" />
-          <Wordmark className="text-[0.72rem] sm:text-[0.82rem]" />
+      <div className="soft-shadow mx-auto flex max-w-content items-center gap-2 rounded-full border border-ink/10 bg-paper/90 px-3 py-2 backdrop-blur-xl sm:gap-4 sm:px-4 sm:py-2.5 md:px-5">
+        <Link href={lh(locale, ``)} className="flex min-w-0 items-center gap-2 sm:gap-2.5" aria-label="OrlaDent Camp">
+          <Logo className="h-8 w-auto shrink-0 text-ink sm:h-9" />
+          {/* The wordmark is the first thing to go on a narrow phone: the
+              logo already identifies the site, and keeping both squeezed the
+              language and login buttons off the edge. */}
+          <Wordmark className="hidden truncate text-[0.72rem] xs:inline sm:text-[0.82rem]" />
         </Link>
 
         <nav className="ms-auto hidden items-center gap-1 text-sm md:flex">
@@ -45,19 +48,21 @@ export default async function Header({ locale }: { locale: string }) {
           ))}
         </nav>
 
-        <div className="ms-auto flex items-center gap-2 md:ms-0">
+        <div className="ms-auto flex shrink-0 items-center gap-1.5 sm:gap-2 md:ms-0">
           <LocaleSwitcher locale={locale} />
           {profile ? (
             <LogoutButton locale={locale} label={t('logout')} />
           ) : (
-            <Link href={lh(locale, `/login`)} className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-white transition hover:bg-brass">
+            <Link href={lh(locale, `/login`)} className="whitespace-nowrap rounded-full bg-ink px-3 py-2 text-xs font-semibold text-white transition hover:bg-brass sm:px-4">
               {t('login')}
             </Link>
           )}
         </div>
       </div>
 
-      <nav className="mx-auto mt-2 flex max-w-max gap-1 overflow-x-auto rounded-full border border-ink/10 bg-paper/90 px-2 py-1.5 text-xs shadow-sm backdrop-blur md:hidden">
+      {/* max-w-max on a scrolling row lets it grow past the viewport; the row
+          needs to be viewport-wide and scroll INSIDE itself instead. */}
+      <nav className="no-scrollbar mx-auto mt-2 flex max-w-full gap-1 overflow-x-auto rounded-full border border-ink/10 bg-paper/90 px-2 py-1.5 text-xs shadow-sm backdrop-blur md:hidden">
         {links.map(([href, label]) => (
           <Link key={href} href={lh(locale, `${href}`)} className="whitespace-nowrap rounded-full px-3 py-1.5 hover:bg-white">{label}</Link>
         ))}

@@ -88,7 +88,13 @@
     "toSignup": "No account yet? Sign up",
     "toLogin": "Already have an account? Log in",
     "verifyNotice": "We sent you a verification email. Open it and confirm to continue.",
-    "tooMany": "Too many attempts. Wait a minute and try again."
+    "tooMany": "Too many attempts. Wait a minute and try again.",
+    "errInvalid": "That email and password don't match an account. Check the password, or create an account if you haven't yet.",
+    "errUnconfirmed": "This account still needs to be confirmed. Open the verification email we sent you.",
+    "errMissing": "Enter your email and password first.",
+    "errExists": "This email already has an account. Log in instead.",
+    "errWeak": "Password must be at least 6 characters.",
+    "errNetwork": "Couldn't reach the server. Check your connection and try again."
   },
   "checkout": {
     "title": "Complete your enrolment",

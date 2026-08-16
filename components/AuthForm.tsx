@@ -22,17 +22,51 @@ export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; l
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
+  /**
+   * Turns a Supabase auth error into something a human can act on.
+   *
+   * "Invalid login credentials" is the single message Supabase returns for
+   * several different situations — wrong password, no such user, and an
+   * account that only exists as a profiles row with no auth user behind it.
+   * Showing that raw string is what made this feel unfixable.
+   */
+  function friendly(message: string): string {
+    const m = message.toLowerCase();
+    if (m.includes('invalid login credentials') || m.includes('invalid credentials')) return t('errInvalid');
+    if (m.includes('email not confirmed') || m.includes('not confirmed')) return t('errUnconfirmed');
+    if (m.includes('rate limit') || m.includes('too many')) return t('tooMany');
+    if (m.includes('already registered') || m.includes('already been registered')) return t('errExists');
+    if (m.includes('password should be') || m.includes('at least 6')) return t('errWeak');
+    if (m.includes('failed to fetch') || m.includes('network') || m.includes('fetch failed')) return t('errNetwork');
+    return message;
+  }
+
   async function submit() {
+    // Normalising the email is not cosmetic. Supabase stores and matches the
+    // address exactly as given, and a phone keyboard adds a trailing space
+    // (and often a capital first letter) on its own. " Sayyed@x.com" and
+    // "sayyed@x.com" are two different accounts to the auth server — one of
+    // which has no password. That alone produces "Invalid login credentials"
+    // with a password the user typed perfectly.
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail || !password) {
+      setError(t('errMissing'));
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
       if (mode === 'signup') {
         const { error } = await supabase.auth.signUp({
-          email,
+          email: cleanEmail,
           password,
           options: {
-            data: { full_name: fullName, region },
-            emailRedirectTo: `${window.location.origin}/${locale}/login`
+            data: { full_name: fullName.trim(), region },
+            // lh() keeps Arabic unprefixed; a hard-coded `/${locale}/login`
+            // sent Arabic users to "/ar/login", which does not exist.
+            emailRedirectTo: `${window.location.origin}${lh(locale, '/login')}`
           }
         });
         if (error) throw error;
@@ -41,15 +75,16 @@ export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; l
         // No pre-flight call here on purpose: it added a full round trip
         // before the login even started. Supabase rate-limits auth attempts
         // on its own side, so the guard was latency for nothing.
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
         if (error) throw error;
 
         // replace() so the back button doesn't land on the login form again.
-        router.replace(params.get('next') ?? lh(locale, '/course'));
+        const next = params.get('next');
+        router.replace(next && next.startsWith('/') ? next : lh(locale, '/course'));
         router.refresh();
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : c('error'));
+      setError(e instanceof Error ? friendly(e.message) : c('error'));
     } finally {
       setBusy(false);
     }
@@ -72,7 +107,13 @@ export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; l
 
       <div>
         <label className="label" htmlFor="email">{t('email')}</label>
-        <input id="email" type="email" autoComplete="email" className="field" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input
+          id="email" type="email" inputMode="email" autoComplete="email"
+          autoCapitalize="none" autoCorrect="off" spellCheck={false}
+          className="field" value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onBlur={() => setEmail(email.trim().toLowerCase())}
+        />
       </div>
 
       <div>

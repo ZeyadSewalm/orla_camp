@@ -29,7 +29,7 @@ export default async function Faq({ params: { locale } }: { params: { locale: st
       <dl className="mt-10 space-y-3">
         {items.map(([q, a]) => (
           <div key={q} className="surface-card p-6 md:p-7">
-            <dt className="text-xl font-semibold">{q}</dt>
+            <dt className="text-base font-semibold md:text-lg">{q}</dt>
             <dd className="mt-2 leading-relaxed text-steel">{a}</dd>
           </div>
         ))}
