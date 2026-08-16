@@ -1,12 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations, unstable_setRequestLocale } from 'next-intl/server';
-import '@fontsource-variable/fraunces';
-import '@fontsource-variable/inter';
-import '@fontsource/ibm-plex-mono/400.css';
-import '@fontsource/ibm-plex-mono/500.css';
-import '@fontsource/ibm-plex-mono/600.css';
-import '@fontsource-variable/noto-kufi-arabic';
 import { notFound } from 'next/navigation';
 import { locales, dir, type Locale } from '@/i18n';
 import { lh } from '@/lib/href';
@@ -14,13 +8,6 @@ import Header from '@/components/Header';
 import RouteProgress from '@/components/RouteProgress';
 import Footer from '@/components/Footer';
 import '../globals.css';
-
-const fontVariables = {
-  '--font-fraunces': '"Fraunces Variable"',
-  '--font-inter': '"Inter Variable"',
-  '--font-plex-mono': '"IBM Plex Mono"',
-  '--font-kufi': '"Noto Kufi Arabic Variable"'
-} as React.CSSProperties;
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -82,7 +69,23 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} dir={dir(locale)} style={fontVariables}>
+    <html lang={locale} dir={dir(locale)}>
+      <head>
+        {/*
+          Preload only the face that actually paints this locale's first
+          screen. Without this the browser has to download the CSS, parse it,
+          discover the @font-face, and only THEN start the font request —
+          three serial round trips before any real text appears. Arabic gets
+          Almarai, English gets Inter; neither pays for the other's file.
+        */}
+        <link
+          rel="preload"
+          as="font"
+          type="font/woff2"
+          href={locale === 'ar' ? '/fonts/almarai-arabic-400.woff2' : '/fonts/inter-latin.woff2'}
+          crossOrigin="anonymous"
+        />
+      </head>
       <body>
         <NextIntlClientProvider messages={messages}>
           <RouteProgress />

@@ -25,9 +25,16 @@ export default function Logo({ className = 'h-10 w-auto' }: { className?: string
   );
 }
 
-export function Wordmark({ className = '' }: { className?: string }) {
+export function Wordmark({ className = '', dir }: { className?: string; dir?: 'ltr' | 'rtl' }) {
   return (
-    <span className={['brand-wordmark block uppercase leading-[0.76]', className].join(' ')}>
+    // leading comes from .brand-wordmark now — the old leading-[0.76] here was
+    // overriding it and slicing the letterforms.
+    //
+    // `dir` is accepted because this is a LATIN lockup. On an Arabic (rtl)
+    // page the browser will otherwise reorder and right-align the three lines,
+    // which is wrong for a fixed brand mark — it should look identical in both
+    // languages.
+    <span dir={dir} className={['brand-wordmark block uppercase', className].join(' ')}>
       ORLA<br />DENT<br />CAMP
     </span>
   );

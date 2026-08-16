@@ -60,10 +60,10 @@ export default async function Home({ params: { locale } }: { params: { locale: s
               <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-brass" />
               {t('kicker')}
             </p>
-            {/* The old floor was 3rem (48px), which does not fit a 360px
-                screen once Arabic words cannot be hyphenated. The vw term is
-                steeper so desktop still reaches the same 5rem. */}
-            <h1 className="display relative max-w-3xl text-[clamp(2rem,8vw,5rem)]">{t('headline')}</h1>
+            {/* Size lives in .h-hero, which carries a separate clamp for
+                Arabic — see globals.css. A single shared clamp is what made
+                the Arabic headline run to seven lines and swallow the fold. */}
+            <h1 className="display h-hero relative max-w-3xl">{t('headline')}</h1>
             <div className="rule-diagonal my-7 text-brass" />
             {/* Was text-lg → md:text-xl, i.e. a 40px body paragraph on
                 desktop under the custom scale. Body copy stays body-sized. */}
@@ -101,7 +101,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       <section className="relative mx-3 mt-1 overflow-hidden rounded-[2.25rem] bg-brandSun py-16 md:mx-5 md:py-20">
         <div aria-hidden className="brand-grid pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative mx-auto max-w-content px-5">
-        <h2 className="display text-3xl sm:text-4xl md:text-[3.5rem]">{t('problemTitle')}</h2>
+        <h2 className="display h-section">{t('problemTitle')}</h2>
         {/* text-2xl is 64px under this project's scale, so the mobile size was
             larger than the md: size. Now it climbs instead of collapsing. */}
         <p className="mt-8 max-w-3xl text-xl font-semibold leading-snug sm:text-2xl">{t('problem1')}</p>
@@ -124,7 +124,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
               <Logo className="h-full w-auto" />
             </div>
             <div>
-              <h2 className="display text-3xl sm:text-4xl md:text-5xl">{t('instructorTitle')}</h2>
+              <h2 className="display h-section">{t('instructorTitle')}</h2>
               <div className="mt-6 max-w-3xl space-y-5 text-base leading-relaxed text-white/75 md:text-lg">
                 <p>{t('instructor1')}</p>
                 <p>{t('instructor2')}</p>
@@ -138,7 +138,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       {/* ── 4. CURRICULUM ── */}
       <section id="curriculum" className="scroll-mt-24">
         <div className="mx-auto max-w-content px-5 py-20">
-          <h2 className="display text-3xl sm:text-4xl md:text-[3.5rem]">{t('curriculumTitle')}</h2>
+          <h2 className="display h-section">{t('curriculumTitle')}</h2>
           <p className="mt-4 max-w-2xl italic text-steel">{t('curriculumNote')}</p>
           <Curriculum locale={locale} labels={{ available: t('statusAvailable'), coming: t('statusComing') }} />
           <p className="mt-12 max-w-3xl border-s-4 border-brass ps-6 italic text-steel">{t('curriculumFooter')}</p>
@@ -147,7 +147,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
 
       {/* ── 5. TIER COMPARISON ── */}
       <section className="mx-auto max-w-content px-5 py-16 md:py-20">
-        <h2 className="display text-3xl sm:text-4xl md:text-[3.5rem]">{t('comparisonTitle')}</h2>
+        <h2 className="display h-section">{t('comparisonTitle')}</h2>
         <p className="mt-4 max-w-3xl italic text-steel">{t('comparisonNote')}</p>
         <TierComparison
           tiers={tiers}
@@ -171,7 +171,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       {/* ── 6. WHAT'S INCLUDED ── */}
       <section className="mx-3 overflow-hidden rounded-[2.25rem] bg-white md:mx-5">
         <div className="mx-auto max-w-content px-5 py-16 md:py-20">
-          <h2 className="display text-3xl sm:text-4xl md:text-[3.5rem]">{t('includedTitle')}</h2>
+          <h2 className="display h-section">{t('includedTitle')}</h2>
           <ul className="mt-10 grid gap-3 md:grid-cols-2">
             {included.map((line, i) => (
               <li key={i} className="flex gap-4 rounded-2xl bg-paper p-5 sm:rounded-3xl sm:p-7">
@@ -185,7 +185,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
 
       {/* ── 7. PRICING + PAYMENT PLANS ── */}
       <section className="mx-auto max-w-content px-5 py-20">
-        <h2 className="display text-3xl sm:text-4xl md:text-5xl">{t('pricingTitle')}</h2>
+        <h2 className="display h-section">{t('pricingTitle')}</h2>
         <div className="mt-8 grid max-w-4xl gap-6 md:grid-cols-2">
           <p className="leading-relaxed text-steel">{t('pricing1')}</p>
           <p className="leading-relaxed text-steel">{t('pricing2')}</p>
@@ -196,7 +196,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       {/* ── 8. FAQ ── */}
       <section className="mx-3 overflow-hidden rounded-[2.25rem] bg-white md:mx-5">
         <div className="mx-auto max-w-content px-5 py-20">
-          <h2 className="display text-3xl sm:text-4xl md:text-[3.5rem]">{f('title')}</h2>
+          <h2 className="display h-section">{f('title')}</h2>
           <dl className="mt-10 max-w-3xl">
             {faqs.map(([q, a]) => (
               <div key={q} className="mb-3 rounded-2xl bg-paper p-5 sm:rounded-3xl sm:p-6">
@@ -213,7 +213,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
         <div className="relative overflow-hidden rounded-[1.5rem] bg-brass p-7 text-white sm:rounded-[2.25rem] sm:p-10 md:p-16">
           <div aria-hidden className="facet-field pointer-events-none absolute inset-0 text-white/25" />
           <div className="relative">
-            <h2 className="display max-w-4xl text-3xl sm:text-4xl md:text-[4.5rem]">{t('finalTitle')}</h2>
+            <h2 className="display h-final max-w-4xl">{t('finalTitle')}</h2>
             <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/85 md:text-lg">{t('finalBody')}</p>
             <Link href={lh(locale, '/pricing')} className="btn-on-dark mt-9 w-full justify-center xs:w-auto">{t('finalCta')}</Link>
           </div>

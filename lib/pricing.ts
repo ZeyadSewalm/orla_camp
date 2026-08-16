@@ -9,8 +9,21 @@ export function tierPrice(tier: Tier, region: Region) {
   return { currency, full, installment, count: tier.installment_count ?? 3 };
 }
 
+/**
+ * Money, formatted for display.
+ *
+ * The Arabic locale is `ar-EG-u-nu-latn`, not `ar-EG`, and that `-u-nu-latn`
+ * is doing real work. Plain `ar-EG` formats with Arabic-Indic digits
+ * (٢٢٬٠٠٠). Those digits do not exist in IBM Plex Mono, which is the face the
+ * `.figure` class applies to every price on the site — so the browser fell
+ * back mid-number to whatever it could find, and the prices rendered as a
+ * mismatched jumble of glyphs at different weights and heights.
+ *
+ * Latin digits also match how prices are written on Egyptian invoices and in
+ * the sales sheet, so this reads more naturally anyway.
+ */
 export function formatMoney(amount: number, currency: Currency, locale: string) {
-  return new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-US', {
+  return new Intl.NumberFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', {
     style: 'currency',
     currency,
     maximumFractionDigits: 0

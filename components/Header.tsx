@@ -22,51 +22,70 @@ export default async function Header({ locale }: { locale: string }) {
   if (profile?.role === 'admin' || profile?.role === 'reviewer') links.push(['/admin', t('admin')]);
 
   return (
-    <header className="sticky top-0 z-50 px-3 pt-3 md:px-5">
-      <div className="soft-shadow mx-auto flex max-w-content items-center gap-2 rounded-full border border-ink/10 bg-paper/90 px-3 py-2 backdrop-blur-xl sm:gap-4 sm:px-4 sm:py-2.5 md:px-5">
-        <Link href={lh(locale, ``)} className="flex min-w-0 items-center gap-2 sm:gap-2.5" aria-label="OrlaDent Camp">
-          <Logo className="h-8 w-auto shrink-0 text-ink sm:h-9" />
-          {/* The wordmark is the first thing to go on a narrow phone: the
-              logo already identifies the site, and keeping both squeezed the
-              language and login buttons off the edge. */}
-          <Wordmark className="hidden truncate text-[0.72rem] xs:inline sm:text-[0.82rem]" />
-        </Link>
+    <>
+      {/*
+        ONLY THIS BAR IS STICKY.
 
-        <nav className="ms-auto hidden items-center gap-1 text-sm md:flex">
-          {links.map(([href, label]) => (
-            <Link
-              key={href}
-              href={lh(locale, `${href}`)}
-              className={
-                href === '/admin'
-                  ? 'rounded-full bg-brass px-4 py-2 text-xs font-semibold text-white hover:bg-brassInk'
-                  : 'rounded-full px-4 py-2 transition hover:bg-white hover:text-brass'
-              }
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
+        Before, the whole <header> was sticky and it held TWO rows: the logo
+        pill and the mobile link row underneath. So on a phone you scrolled and
+        two separate pills stayed pinned on top of the content, stacked, and
+        you read the page through a ~130px-tall window. One pinned bar, not two.
+      */}
+      <header className="sticky top-0 z-50 px-3 pt-3 md:px-5">
+        <div className="soft-shadow mx-auto flex max-w-content items-center gap-2 rounded-full border border-ink/10 bg-paper/90 px-3 py-2 backdrop-blur-xl sm:gap-4 sm:px-4 sm:py-2.5 md:px-5">
+          <Link href={lh(locale, ``)} className="flex min-w-0 items-center gap-2 sm:gap-2.5" aria-label="OrlaDent Camp">
+            <Logo className="h-8 w-auto shrink-0 text-ink sm:h-9" />
+            {/* The name stays visible at every width — it is the brand. It is
+                the NAV LINKS that leave this bar on mobile, not the wordmark. */}
+            <Wordmark className="text-[0.6rem] sm:text-[0.72rem] md:text-[0.82rem]" />
+          </Link>
 
-        <div className="ms-auto flex shrink-0 items-center gap-1.5 sm:gap-2 md:ms-0">
-          <LocaleSwitcher locale={locale} />
-          {profile ? (
-            <LogoutButton locale={locale} label={t('logout')} />
-          ) : (
-            <Link href={lh(locale, `/login`)} className="whitespace-nowrap rounded-full bg-ink px-3 py-2 text-xs font-semibold text-white transition hover:bg-brass sm:px-4">
-              {t('login')}
-            </Link>
-          )}
+          <nav className="ms-auto hidden items-center gap-1 text-sm md:flex">
+            {links.map(([href, label]) => (
+              <Link
+                key={href}
+                href={lh(locale, `${href}`)}
+                className={
+                  href === '/admin'
+                    ? 'rounded-full bg-brass px-4 py-2 text-xs font-semibold text-white hover:bg-brassInk'
+                    : 'rounded-full px-4 py-2 transition hover:bg-white hover:text-brass'
+                }
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="ms-auto flex shrink-0 items-center gap-1.5 sm:gap-2 md:ms-0">
+            <LocaleSwitcher locale={locale} />
+            {profile ? (
+              <LogoutButton locale={locale} label={t('logout')} />
+            ) : (
+              <Link href={lh(locale, `/login`)} className="whitespace-nowrap rounded-full bg-ink px-3 py-2 text-xs font-semibold text-white transition hover:bg-brass sm:px-4">
+                {t('login')}
+              </Link>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* max-w-max on a scrolling row lets it grow past the viewport; the row
-          needs to be viewport-wide and scroll INSIDE itself instead. */}
-      <nav className="no-scrollbar mx-auto mt-2 flex max-w-full gap-1 overflow-x-auto rounded-full border border-ink/10 bg-paper/90 px-2 py-1.5 text-xs shadow-sm backdrop-blur md:hidden">
+      {/*
+        Mobile links — deliberately OUTSIDE the sticky header, so this row
+        scrolls away with the page and only the bar above stays pinned.
+        max-w-full (not max-w-max) so the row is viewport-wide and scrolls
+        inside itself instead of growing past the screen edge.
+      */}
+      <nav className="no-scrollbar mx-auto mt-2 flex max-w-full gap-1 overflow-x-auto px-3 pb-1 text-xs md:hidden">
         {links.map(([href, label]) => (
-          <Link key={href} href={lh(locale, `${href}`)} className="whitespace-nowrap rounded-full px-3 py-1.5 hover:bg-white">{label}</Link>
+          <Link
+            key={href}
+            href={lh(locale, `${href}`)}
+            className="whitespace-nowrap rounded-full border border-ink/10 bg-paper/90 px-3.5 py-2 shadow-sm hover:bg-white"
+          >
+            {label}
+          </Link>
         ))}
       </nav>
-    </header>
+    </>
   );
 }
