@@ -23,7 +23,8 @@ export default async function Header({ locale }: { locale: string }) {
   if (profile?.role === 'admin' || profile?.role === 'reviewer') links.push(['/admin', t('admin')]);
 
   return (
-    <StickyHeader>
+    <>
+      <StickyHeader />
       {/*
         ONLY THIS BAR IS STICKY.
 
@@ -32,7 +33,7 @@ export default async function Header({ locale }: { locale: string }) {
         two separate pills stayed pinned on top of the content, stacked, and
         you read the page through a ~130px-tall window. One pinned bar, not two.
       */}
-      <header className="site-header sticky top-0 z-50 px-3 pt-3 md:px-5">
+      <header className="site-header sticky top-0 z-50">
         {/*
           The glass and the shrink both live in globals.css, driven by the
           data-scrolled attribute StickyHeader sets. Tailwind's bg-paper/90 is
@@ -40,7 +41,14 @@ export default async function Header({ locale }: { locale: string }) {
           left for backdrop-blur to blur, so the "glass" was really just a
           tinted bar. The real translucency is set in CSS.
         */}
-        <div className="site-shell mx-auto flex max-w-content items-center gap-2 rounded-full border border-ink/10 px-3 sm:gap-4 sm:px-4 md:px-5">
+        {/*
+          Width, radius, padding and background are ALL owned by .site-shell in
+          globals.css — they are the properties that animate between the
+          full-width bar and the floating pill. Leaving Tailwind's
+          max-w-content / rounded-full / px-* here would pin them at the
+          scrolled values and the bar would never expand.
+        */}
+        <div className="site-shell mx-auto flex items-center gap-2 border sm:gap-4">
           <Link href={lh(locale, ``)} className="flex min-w-0 items-center gap-2 sm:gap-2.5" aria-label="OrlaDent Camp">
             <Logo className="header-logo h-8 w-auto shrink-0 text-ink sm:h-9" />
             {/*
@@ -103,6 +111,6 @@ export default async function Header({ locale }: { locale: string }) {
           </Link>
         ))}
       </nav>
-    </StickyHeader>
+    </>
   );
 }
