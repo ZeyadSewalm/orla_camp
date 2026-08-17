@@ -72,7 +72,11 @@ export default async function Home({ params: { locale } }: { params: { locale: s
             {/* Full-width stacked on a phone, side by side from 400px up —
                 two half-width buttons on a 360px screen wrap their labels. */}
             <div className="mt-9 flex flex-col gap-3 xs:flex-row xs:flex-wrap xs:items-center md:mt-10">
-              <MagneticButton href={lh(locale, '/signup')} className="btn-brass w-full justify-center xs:w-auto">{t('ctaPrimary')}</MagneticButton>
+              {/* The button says "free Single Crown lesson" — so it now goes to the
+                  free lesson, not to a signup form. Promising something free
+                  and delivering a signup wall is the fastest way to lose
+                  someone at the very first click. */}
+              <MagneticButton href={lh(locale, '/free-lesson')} className="btn-brass w-full justify-center xs:w-auto">{t('ctaPrimary')}</MagneticButton>
               <a href="#curriculum" className="btn-quiet w-full justify-center xs:w-auto">{t('ctaSecondary')}</a>
             </div>
 

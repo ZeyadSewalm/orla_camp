@@ -94,7 +94,21 @@
     "errMissing": "Enter your email and password first.",
     "errExists": "This email already has an account. Log in instead.",
     "errWeak": "Password must be at least 6 characters.",
-    "errNetwork": "Couldn't reach the server. Check your connection and try again."
+    "errNetwork": "Couldn't reach the server. Check your connection and try again.",
+    "forgotLink": "Forgot your password?",
+    "forgotTitle": "Reset your password",
+    "forgotIntro": "Enter the email you signed up with and we'll send you a link to set a new password.",
+    "sendResetLink": "Send reset link",
+    "resetSent": "If an account exists for that email, a reset link is on its way. The link works once and expires in an hour.",
+    "resetSpamHint": "Nothing after a few minutes? Check your spam folder, and make sure the address is the one you signed up with.",
+    "resetExpired": "That link has expired or was already used. Request a new one.",
+    "resetTitle": "Set a new password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "savePassword": "Save new password",
+    "resetDone": "Password updated. Taking you to the course…",
+    "errShort": "Password must be at least 8 characters.",
+    "errMismatch": "The two passwords don't match."
   },
   "checkout": {
     "title": "Complete your enrolment",
@@ -249,5 +263,26 @@
     "error": "Something went wrong. Try again.",
     "back": "Back",
     "language": "العربية"
+  },
+  "free": {
+    "metaTitle": "Free lesson — OrlaDent Camp",
+    "metaDescription": "Watch a full module from the camp, free. No card, no account.",
+    "kicker": "Free lesson",
+    "title": "A full module, free",
+    "subhead": "Not a trailer and not a sales call — one complete module from the camp, start to finish, the same one paying students get.",
+    "point1": "The full workflow, uncut — no skipped steps",
+    "point2": "Watch it as many times as you like",
+    "point3": "No card, no account, no call",
+    "formIntro": "Tell us where to send it and it plays right here.",
+    "name": "Your name (optional)",
+    "email": "Email",
+    "unlock": "Watch the lesson",
+    "privacy": "We'll email you when new modules go live. No card and no account needed, and you can unsubscribe any time.",
+    "errEmail": "Enter a valid email address.",
+    "nextTitle": "That's one module. There are more.",
+    "nextBody": "The camp covers basics through full-arch implant cases, with a checklist for every module and a QC review on your own case files.",
+    "seePlans": "See the plans",
+    "readFaq": "Read the FAQ",
+    "comingSoon": "The free lesson is being finalised. The plans below are live in the meantime — and no plan includes an accredited certificate."
   }
 }

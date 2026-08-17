@@ -163,9 +163,18 @@ export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; l
         )}
       </button>
 
-      <Link href={lh(locale, `/${mode === 'signup' ? 'login' : 'signup'}`)} className="block text-sm text-brass underline">
-        {mode === 'signup' ? t('toLogin') : t('toSignup')}
-      </Link>
+      <div className="space-y-2">
+        <Link href={lh(locale, `/${mode === 'signup' ? 'login' : 'signup'}`)} className="block text-sm text-brass underline">
+          {mode === 'signup' ? t('toLogin') : t('toSignup')}
+        </Link>
+
+        {/* Only on login. On the signup form it would just be confusing. */}
+        {mode === 'login' && (
+          <Link href={lh(locale, '/forgot-password')} className="block text-sm text-steel underline">
+            {t('forgotLink')}
+          </Link>
+        )}
+      </div>
     </div>
   );
 }

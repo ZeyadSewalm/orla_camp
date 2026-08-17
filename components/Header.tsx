@@ -6,6 +6,7 @@ import LogoutButton from './LogoutButton';
 import { getSessionUser } from '@/lib/supabase/server';
 import { getCachedRole } from '@/lib/data';
 import { lh } from '@/lib/href';
+import StickyHeader from './StickyHeader';
 
 export default async function Header({ locale }: { locale: string }) {
   const t = await getTranslations('nav');
@@ -22,7 +23,7 @@ export default async function Header({ locale }: { locale: string }) {
   if (profile?.role === 'admin' || profile?.role === 'reviewer') links.push(['/admin', t('admin')]);
 
   return (
-    <>
+    <StickyHeader>
       {/*
         ONLY THIS BAR IS STICKY.
 
@@ -31,10 +32,17 @@ export default async function Header({ locale }: { locale: string }) {
         two separate pills stayed pinned on top of the content, stacked, and
         you read the page through a ~130px-tall window. One pinned bar, not two.
       */}
-      <header className="sticky top-0 z-50 px-3 pt-3 md:px-5">
-        <div className="soft-shadow mx-auto flex max-w-content items-center gap-2 rounded-full border border-ink/10 bg-paper/90 px-3 py-2 backdrop-blur-xl sm:gap-4 sm:px-4 sm:py-2.5 md:px-5">
+      <header className="site-header sticky top-0 z-50 px-3 pt-3 md:px-5">
+        {/*
+          The glass and the shrink both live in globals.css, driven by the
+          data-scrolled attribute StickyHeader sets. Tailwind's bg-paper/90 is
+          gone from here on purpose: at 90% opacity there was almost nothing
+          left for backdrop-blur to blur, so the "glass" was really just a
+          tinted bar. The real translucency is set in CSS.
+        */}
+        <div className="site-shell mx-auto flex max-w-content items-center gap-2 rounded-full border border-ink/10 px-3 sm:gap-4 sm:px-4 md:px-5">
           <Link href={lh(locale, ``)} className="flex min-w-0 items-center gap-2 sm:gap-2.5" aria-label="OrlaDent Camp">
-            <Logo className="h-8 w-auto shrink-0 text-ink sm:h-9" />
+            <Logo className="header-logo h-8 w-auto shrink-0 text-ink sm:h-9" />
             {/*
               The name is visible at EVERY width — but in two forms.
 
@@ -95,6 +103,6 @@ export default async function Header({ locale }: { locale: string }) {
           </Link>
         ))}
       </nav>
-    </>
+    </StickyHeader>
   );
 }

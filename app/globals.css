@@ -434,6 +434,107 @@ table {
   }
 }
 
+/* =============================================================
+   STICKY HEADER — full at the top, compact once you scroll
+   =============================================================
+   Driven by data-scrolled, which StickyHeader.tsx sets from an
+   IntersectionObserver. Everything visual is here so the Header itself can
+   stay a Server Component.
+
+   The glass is real here: 55% background at the top means backdrop-filter
+   actually has something to blur. The previous bg-paper/90 left only 10%
+   showing through, so the blur was doing almost nothing and the bar just
+   looked tinted.
+
+   Only compositor-friendly properties are animated. Height is NOT animated —
+   `height` transitions force layout on every frame, which is exactly the jank
+   this is supposed to avoid. Padding on a flex row gives the same shrink for
+   far less work.
+   ============================================================= */
+
+.site-shell {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  background-color: rgb(245 239 230 / 0.55);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+  box-shadow: 0 1px 2px rgb(26 26 26 / 0.04);
+  transition:
+    padding 0.28s ease,
+    background-color 0.28s ease,
+    box-shadow 0.28s ease,
+    backdrop-filter 0.28s ease,
+    border-color 0.28s ease;
+}
+
+@media (min-width: 640px) {
+  .site-shell {
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+  }
+}
+
+.site-header {
+  transition: padding-top 0.28s ease;
+}
+
+.header-logo {
+  transition: height 0.28s ease;
+}
+
+/* ---------- scrolled state ---------- */
+
+[data-scrolled='true'] .site-header {
+  padding-top: 0.375rem;
+}
+
+[data-scrolled='true'] .site-shell {
+  padding-top: 0.3125rem;
+  padding-bottom: 0.3125rem;
+  /* Denser glass once there is content moving underneath it. */
+  background-color: rgb(245 239 230 / 0.72);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-color: rgb(26 26 26 / 0.06);
+  box-shadow: 0 12px 32px -14px rgb(26 26 26 / 0.28);
+}
+
+[data-scrolled='true'] .header-logo {
+  height: 1.75rem;
+}
+
+/*
+ * Safari on iOS drops backdrop-filter when the element is also being
+ * transformed. Promoting the bar to its own layer keeps the blur painting
+ * through the whole transition instead of flickering off and back on.
+ */
+.site-shell {
+  will-change: backdrop-filter;
+  transform: translateZ(0);
+}
+
+/*
+ * No backdrop-filter support (older Android WebView) — fall back to a solid
+ * bar. Without this the header would be 55% transparent with the page text
+ * scrolling straight through it, which is unreadable.
+ */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .site-shell {
+    background-color: rgb(245 239 230 / 0.97);
+  }
+  [data-scrolled='true'] .site-shell {
+    background-color: rgb(245 239 230 / 0.99);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-shell,
+  .site-header,
+  .header-logo {
+    transition: none;
+  }
+}
+
 /* Horizontal chip rows (the mobile nav) scroll without an ugly bar. */
 .no-scrollbar {
   scrollbar-width: none;
