@@ -41,6 +41,17 @@ export default function Reveal({
       return;
     }
 
+    /*
+     * Only hide what is actually still below the fold.
+     *
+     * Without this check, a heading already on screen at load gets hidden by
+     * this effect and then faded back in a frame later — a visible flash on
+     * exactly the content the visitor is already looking at. Anything in view
+     * at mount is simply left alone.
+     */
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight * 0.9) return;
+
     el.dataset.reveal = 'pending';
     if (delay) el.style.transitionDelay = `${delay}ms`;
 

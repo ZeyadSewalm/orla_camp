@@ -340,6 +340,118 @@ html[lang='ar'] .display {
   .float-mark { animation: none; }
 }
 
+/* =============================================================
+   3D SPINNING MARK — CSS, not a 3D engine
+   =============================================================
+   perspective + preserve-3d + a mirrored back face gives a genuine
+   three-dimensional rotation. It runs entirely on the compositor, so it holds
+   60fps on a cheap Android and adds zero bytes of JavaScript.
+
+   The project used to carry a three.js version of exactly this. It was 600 KB
+   of library, on a marketing page, for a decorative spin — and nothing
+   imported it. This is the same effect at none of the cost.
+   ============================================================= */
+
+.mark-3d {
+  perspective: 1200px;
+}
+
+/* inset:0 rather than height:100% — see HeroMark.tsx. A percentage height
+   chain inside a flex item collapsed to zero and took the whole mark with
+   it. */
+.mark-3d-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  animation: spinMark 16s linear infinite;
+}
+
+/*
+ * The SVG carries a viewBox, so width/height 100% scales it to fit the box
+ * while preserveAspectRatio (default xMidYMid meet) keeps its proportions and
+ * centres it. No `w-auto` needed, and nothing to collapse.
+ */
+.mark-3d-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.mark-3d-back {
+  transform: rotateY(180deg);
+}
+
+@keyframes spinMark {
+  from { transform: rotateY(0deg); }
+  to   { transform: rotateY(360deg); }
+}
+
+/* =============================================================
+   PARALLAX — scroll-driven, zero JavaScript
+   =============================================================
+   `animation-timeline: view()` ties an animation to an element's own progress
+   through the viewport. The browser drives it off the main thread, so it
+   cannot jank the way a scroll listener setting transforms can.
+
+   Wrapped in @supports on purpose: where it is unsupported the element simply
+   sits still. A static decoration is a perfectly good outcome; a scroll
+   listener running on every frame of every page, to move a coloured square,
+   is not.
+   ============================================================= */
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .parallax-slow,
+    .parallax-fast {
+      animation: parallaxDrift linear both;
+      animation-timeline: view();
+      animation-range: entry 0% exit 100%;
+      will-change: transform;
+    }
+    .parallax-slow { --drift: 2.5rem; }
+    .parallax-fast { --drift: 6rem; }
+  }
+}
+
+@keyframes parallaxDrift {
+  from { transform: translateY(var(--drift, 3rem)); }
+  to   { transform: translateY(calc(var(--drift, 3rem) * -1)); }
+}
+
+/* =============================================================
+   SCROLL REVEAL
+   =============================================================
+   Set by Reveal.tsx. The element is only hidden AFTER the script confirms it
+   can animate — data-reveal is never in the server HTML. If JS fails or is
+   blocked, nothing is hidden and the page reads normally. Content that can
+   get stuck invisible is the classic way this pattern breaks a site.
+   ============================================================= */
+
+[data-reveal='pending'] {
+  opacity: 0;
+  transform: translateY(1.25rem);
+}
+
+[data-reveal] {
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-reveal='in'] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark-3d-inner { animation: none; }
+  [data-reveal] { transition: none; }
+  [data-reveal='pending'] { opacity: 1; transform: none; }
+}
+
 @keyframes progress {
   from { transform: scaleX(0); }
   60%  { transform: scaleX(0.75); }

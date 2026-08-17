@@ -25,18 +25,31 @@ export default function HeroMark({ className = '' }: { className?: string }) {
       <div className="relative flex h-full flex-col items-center justify-center gap-5 overflow-hidden rounded-[2.5rem] px-6 py-8">
         <span aria-hidden className="facet-field pointer-events-none absolute inset-0 text-white/80" />
 
-        {/* min-h-0 lets the eagle shrink inside the flex column instead of
-            pushing the wordmark out of the rounded card. */}
-        <div className="relative flex min-h-0 flex-1 items-center justify-center">
-          <Logo className="float-mark h-full w-auto text-white drop-shadow-[0_18px_0_rgba(26,26,26,0.16)]" />
-        </div>
+        {/*
+          Two nested transforms, on purpose: the outer box floats (translateY),
+          the inner one spins in 3D (rotateY). Combining them on one element
+          would mean the two animations fight over `transform` and one wins.
 
-        {/* In normal flow now — never underneath the mark. Always LTR: the
-            wordmark is a Latin lockup regardless of page language. */}
-        <Wordmark
-          dir="ltr"
-          className="relative shrink-0 text-center text-[clamp(1.1rem,2vw,1.6rem)] text-white"
-        />
+          ABSOLUTE, NOT h-full. The first version chained `height: 100%` three
+          levels deep inside a flex item, and the chain collapsed to zero — the
+          eagle vanished completely. A percentage height only resolves against
+          a parent with a definite height, and a `flex-1` item does not reliably
+          give one. Positioning against the `relative` wrapper sidesteps the
+          whole problem: the box is whatever size flex made the wrapper.
+
+          This is real 3D — perspective + preserve-3d + a mirrored back face —
+          but it is CSS, so it composites on the GPU and costs no JavaScript.
+          The three.js version of this mark that used to sit unused in the
+          project cost 600 KB before drawing a single frame.
+        */}
+        <div className="relative flex min-h-0 flex-1 items-center justify-center self-stretch">
+          <div className="float-mark mark-3d absolute inset-0">
+            <div className="mark-3d-inner">
+              <Logo className="mark-3d-face text-white drop-shadow-[0_18px_0_rgba(26,26,26,0.16)]" />
+              <Logo className="mark-3d-face mark-3d-back text-white drop-shadow-[0_18px_0_rgba(26,26,26,0.16)]" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

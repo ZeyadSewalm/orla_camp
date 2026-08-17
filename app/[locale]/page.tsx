@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
 import Logo from '@/components/Logo';
 import HeroMark from '@/components/HeroMark';
+import Reveal from '@/components/Reveal';
 import MagneticButton from '@/components/MagneticButton';
 import Curriculum from '@/components/Curriculum';
 import TierComparison from '@/components/TierComparison';
@@ -50,8 +51,8 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       <section className="relative overflow-hidden px-3 pb-4 pt-6 md:px-5 md:pt-8">
         {/* Decorative only — hidden on phones, where they sat under the text
             and forced horizontal scroll. */}
-        <div aria-hidden className="absolute -start-10 top-12 hidden h-32 w-32 rotate-12 bg-brandSun sm:block md:h-44 md:w-44" />
-        <div aria-hidden className="absolute -end-10 bottom-10 hidden h-32 w-32 rounded-full bg-brandCoral sm:block md:h-40 md:w-40" />
+        <div aria-hidden className="parallax-fast absolute -start-10 top-12 hidden h-32 w-32 rotate-12 bg-brandSun sm:block md:h-44 md:w-44" />
+        <div aria-hidden className="parallax-slow absolute -end-10 bottom-10 hidden h-32 w-32 rounded-full bg-brandCoral sm:block md:h-40 md:w-40" />
 
         <div className="soft-shadow relative mx-auto grid max-w-[90rem] items-center gap-10 overflow-hidden rounded-[1.5rem] border border-ink/10 bg-white px-5 py-10 sm:rounded-[2.25rem] sm:px-6 sm:py-14 md:grid-cols-[1.1fr_0.9fr] md:gap-12 md:px-12 md:py-16 lg:px-16">
           <span aria-hidden className="facet-field pointer-events-none absolute inset-0 text-brass" />
@@ -111,7 +112,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       <section className="relative mx-3 mt-1 overflow-hidden rounded-[2.25rem] bg-brandSun py-16 md:mx-5 md:py-20">
         <div aria-hidden className="brand-grid pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative mx-auto max-w-content px-5">
-        <h2 className="display h-section">{t('problemTitle')}</h2>
+        <Reveal as="h2" className="display h-section">{t('problemTitle')}</Reveal>
         {/* text-2xl is 64px under this project's scale, so the mobile size was
             larger than the md: size. Now it climbs instead of collapsing. */}
         <p className="mt-8 max-w-3xl text-xl font-semibold leading-snug sm:text-2xl">{t('problem1')}</p>
@@ -134,7 +135,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
               <Logo className="h-full w-auto" />
             </div>
             <div>
-              <h2 className="display h-section">{t('instructorTitle')}</h2>
+              <Reveal as="h2" className="display h-section">{t('instructorTitle')}</Reveal>
               <div className="mt-6 max-w-3xl space-y-5 text-base leading-relaxed text-white/75 md:text-lg">
                 <p>{t('instructor1')}</p>
                 <p>{t('instructor2')}</p>
@@ -148,16 +149,23 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       {/* ── 4. CURRICULUM ── */}
       <section id="curriculum" className="scroll-mt-24">
         <div className="mx-auto max-w-content px-5 py-20">
-          <h2 className="display h-section">{t('curriculumTitle')}</h2>
+          <Reveal as="h2" className="display h-section">{t('curriculumTitle')}</Reveal>
           <p className="mt-4 max-w-2xl italic text-steel">{t('curriculumNote')}</p>
           <Curriculum locale={locale} labels={{ available: t('statusAvailable'), coming: t('statusComing') }} />
           <p className="mt-12 max-w-3xl border-s-4 border-brass ps-6 italic text-steel">{t('curriculumFooter')}</p>
         </div>
       </section>
 
-      {/* ── 5. TIER COMPARISON ── */}
+      {/* ── 5. TIER COMPARISON ──
+          Guarded on `tiers`: TierComparison returns null when the table is
+          empty, and without this the section still printed its heading and
+          intro over nothing at all. That only happens when Supabase is
+          unreachable — which the fail-soft data layer now allows the page to
+          survive — so the page has to survive it looking right too, not just
+          without throwing. */}
+      {tiers.length > 0 && (
       <section className="mx-auto max-w-content px-5 py-16 md:py-20">
-        <h2 className="display h-section">{t('comparisonTitle')}</h2>
+        <Reveal as="h2" className="display h-section">{t('comparisonTitle')}</Reveal>
         <p className="mt-4 max-w-3xl italic text-steel">{t('comparisonNote')}</p>
         <TierComparison
           tiers={tiers}
@@ -177,11 +185,12 @@ export default async function Home({ params: { locale } }: { params: { locale: s
           <Link href={lh(locale, '/apply-production-partner')} className="btn-outline w-full justify-center xs:w-auto">{p('requestCall')}</Link>
         </div>
       </section>
+      )}
 
       {/* ── 6. WHAT'S INCLUDED ── */}
       <section className="mx-3 overflow-hidden rounded-[2.25rem] bg-white md:mx-5">
         <div className="mx-auto max-w-content px-5 py-16 md:py-20">
-          <h2 className="display h-section">{t('includedTitle')}</h2>
+          <Reveal as="h2" className="display h-section">{t('includedTitle')}</Reveal>
           <ul className="mt-10 grid gap-3 md:grid-cols-2">
             {included.map((line, i) => (
               <li key={i} className="flex gap-4 rounded-2xl bg-paper p-5 sm:rounded-3xl sm:p-7">
@@ -195,7 +204,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
 
       {/* ── 7. PRICING + PAYMENT PLANS ── */}
       <section className="mx-auto max-w-content px-5 py-20">
-        <h2 className="display h-section">{t('pricingTitle')}</h2>
+        <Reveal as="h2" className="display h-section">{t('pricingTitle')}</Reveal>
         <div className="mt-8 grid max-w-4xl gap-6 md:grid-cols-2">
           <p className="leading-relaxed text-steel">{t('pricing1')}</p>
           <p className="leading-relaxed text-steel">{t('pricing2')}</p>
@@ -206,7 +215,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       {/* ── 8. FAQ ── */}
       <section className="mx-3 overflow-hidden rounded-[2.25rem] bg-white md:mx-5">
         <div className="mx-auto max-w-content px-5 py-20">
-          <h2 className="display h-section">{f('title')}</h2>
+          <Reveal as="h2" className="display h-section">{f('title')}</Reveal>
           <dl className="mt-10 max-w-3xl">
             {faqs.map(([q, a]) => (
               <div key={q} className="mb-3 rounded-2xl bg-paper p-5 sm:rounded-3xl sm:p-6">
@@ -223,7 +232,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
         <div className="relative overflow-hidden rounded-[1.5rem] bg-brass p-7 text-white sm:rounded-[2.25rem] sm:p-10 md:p-16">
           <div aria-hidden className="facet-field pointer-events-none absolute inset-0 text-white/25" />
           <div className="relative">
-            <h2 className="display h-final max-w-4xl">{t('finalTitle')}</h2>
+            <Reveal as="h2" className="display h-final max-w-4xl">{t('finalTitle')}</Reveal>
             <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/85 md:text-lg">{t('finalBody')}</p>
             <Link href={lh(locale, '/pricing')} className="btn-on-dark mt-9 w-full justify-center xs:w-auto">{t('finalCta')}</Link>
           </div>
