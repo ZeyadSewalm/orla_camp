@@ -57,7 +57,22 @@ export const getTiers = unstable_cache(
 export const getModules = unstable_cache(
   async (): Promise<CourseModule[]> =>
     safe('modules', async () => {
-      const { data } = await createPublicClient()
+      /*
+       * SERVICE ROLE, not the anon client — and this is a security boundary,
+       * not a preference.
+       *
+       * migration-007 revokes SELECT on `video_link` and `bunny_video_id` from
+       * anon, because the anon key ships inside the browser bundle and anyone
+       * could query those two columns directly and walk off with every paid
+       * video URL. RLS is row-level; it never restricted columns.
+       *
+       * With those grants gone the anon client can no longer read them, so
+       * this read runs as service_role. That is safe here precisely because
+       * this function is server-only: it lives inside unstable_cache, is never
+       * imported by a client component, and the pages that use it gate on
+       * has_access before they ever build a video URL.
+       */
+      const { data } = await createAdminClient()
         .from('course_modules')
         .select('id,title_ar,title_en,description_ar,description_en,video_link,video_source,bunny_video_id,checklist_file_url,thumbnail_url,block,status,duration_minutes,is_free_preview,order_index')
         .order('order_index');

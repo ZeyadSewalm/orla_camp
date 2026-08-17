@@ -57,3 +57,28 @@ export async function captureLead(input: {
     return { ok: false, error: 'failed' };
   }
 }
+
+
+/**
+ * Returns the free lesson's playable URL — only when asked for, never in the
+ * page's HTML.
+ *
+ * The page used to render `<FreeLessonGate src={videoSrcFor(lesson)} />`,
+ * which put the video URL into the RSC payload of a page anyone can open.
+ * View-source, copy the link, watch the lesson, never leave an email. The gate
+ * was decoration.
+ *
+ * Now the URL is fetched after the form is submitted. This is a lead magnet,
+ * not paid content, so the goal is simply that the address is not sitting in
+ * the page source — not to make it unobtainable.
+ */
+export async function getFreeLessonSource(): Promise<{ src: string | null; poster: string | null; title: string }> {
+  const { getModules } = await import('@/lib/data');
+  const { videoSrcFor, posterFor } = await import('@/lib/video-src');
+
+  const modules = await getModules();
+  const lesson = modules.find((m) => m.is_free_preview);
+  if (!lesson) return { src: null, poster: null, title: '' };
+
+  return { src: videoSrcFor(lesson), poster: posterFor(lesson), title: lesson.title_en };
+}

@@ -42,7 +42,21 @@ export default function CheckoutClient({ tier, region, locale }: { tier: Tier; r
     }
   }
 
-  async function pay(provider: 'paymob' | 'paypal') {
+  function checkoutError(code: string): string {
+    switch (code) {
+      case 'tier_sold_out':       return t('errSoldOut');
+      case 'already_purchased':   return t('errAlreadyPurchased');
+      case 'tier_requires_call':  return t('errRequiresCall');
+      case 'amount_invalid':
+      case 'price_unavailable':   return t('errAmount');
+      case 'tap_not_configured':
+      case 'paymob_is_egp_only':
+      case 'tap_is_usd_only_here': return t('errUnavailable');
+      default:                    return t('errGeneric');
+    }
+  }
+
+  async function pay(provider: 'paymob' | 'tap') {
     setBusy(provider);
     setError(null);
     try {
@@ -60,7 +74,10 @@ export default function CheckoutClient({ tier, region, locale }: { tier: Tier; r
       if (!res.ok || !data.url) throw new Error(data.error ?? 'failed');
       window.location.href = data.url;
     } catch (e) {
-      setError(e instanceof Error ? e.message : c('error'));
+      // The server throws machine codes ('tier_sold_out', 'already_purchased').
+      // Showing those raw put literal English snake_case in front of an Arabic
+      // buyer at the exact moment they were trying to pay.
+      setError(checkoutError(e instanceof Error ? e.message : ''));
       setBusy(null);
     }
   }
@@ -109,8 +126,10 @@ export default function CheckoutClient({ tier, region, locale }: { tier: Tier; r
         <button type="button" onClick={() => pay('paymob')} disabled={!!busy} className="btn-primary disabled:opacity-50">
           {busy === 'paymob' ? t('processing') : t('payPaymob')}
         </button>
-        <button type="button" onClick={() => pay('paypal')} disabled={!!busy} className="btn-brass disabled:opacity-50">
-          {busy === 'paypal' ? t('processing') : t('payPaypal')}
+        {/* Gulf / international. Tap covers cards plus mada, KNET, Benefit
+            and Apple Pay — the methods a Gulf customer actually uses. */}
+        <button type="button" onClick={() => pay('tap')} disabled={!!busy} className="btn-brass disabled:opacity-50">
+          {busy === 'tap' ? t('processing') : t('payTap')}
         </button>
       </div>
     </div>

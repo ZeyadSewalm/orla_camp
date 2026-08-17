@@ -36,6 +36,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  await grantAccessForPayment(paymentId, paymobOrderId);
+  // Paymob reports integer piastres; our payments row is in pounds.
+  const capturedEgp = Number(transaction.amount_cents ?? NaN) / 100;
+
+  await grantAccessForPayment(paymentId, paymobOrderId, capturedEgp);
   return NextResponse.json({ ok: true });
 }

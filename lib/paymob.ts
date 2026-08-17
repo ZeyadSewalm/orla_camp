@@ -76,9 +76,24 @@ const pick = (obj: Record<string, any>, path: string) =>
   path.split('.').reduce<any>((acc, key) => (acc == null ? acc : acc[key]), obj);
 
 export function verifyPaymobHmac(transaction: Record<string, any>, receivedHmac: string) {
+  /*
+   * A missing secret must FAIL the check, not crash it.
+   *
+   * `createHmac('sha512', undefined)` throws, so an unconfigured environment
+   * turned every webhook into a 500. Paymob retries on 5xx, so a
+   * misconfiguration became a retry loop against an endpoint that could never
+   * succeed. Returning false rejects it cleanly with a 401 and leaves a log
+   * line saying exactly what is missing.
+   */
+  const secret = process.env.PAYMOB_HMAC_SECRET;
+  if (!secret) {
+    console.error('[paymob] PAYMOB_HMAC_SECRET is not set — rejecting webhook');
+    return false;
+  }
+
   const concatenated = HMAC_FIELDS.map((field) => String(pick(transaction, field))).join('');
   const expected = crypto
-    .createHmac('sha512', process.env.PAYMOB_HMAC_SECRET!)
+    .createHmac('sha512', secret)
     .update(concatenated)
     .digest('hex');
   try {

@@ -120,7 +120,6 @@
     "promoApplied": "Code applied — {amount} off",
     "total": "Total",
     "payPaymob": "Pay by card / Fawry",
-    "payPaypal": "Pay with PayPal",
     "processing": "One moment…",
     "promoErrors": {
       "notFound": "That code doesn't exist.",
@@ -128,7 +127,14 @@
       "expired": "That code has expired.",
       "exhausted": "That code has reached its usage limit.",
       "wrongTier": "That code doesn't apply to this plan."
-    }
+    },
+    "payTap": "Pay with card / Apple Pay (Gulf & international)",
+    "errSoldOut": "This tier is fully booked. Get in touch and we'll tell you when a seat opens.",
+    "errAlreadyPurchased": "You already have this plan. Head to the course.",
+    "errRequiresCall": "This plan is arranged on a call, not through checkout.",
+    "errAmount": "Something's off with the price. Refresh and try again.",
+    "errUnavailable": "This payment method isn't set up yet. Try the other one.",
+    "errGeneric": "Couldn't start checkout. Try again, or contact us if it keeps failing."
   },
   "course": {
     "title": "Course",

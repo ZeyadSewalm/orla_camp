@@ -4,7 +4,6 @@ import type { Metadata } from 'next';
 import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
 import FreeLessonGate from '@/components/FreeLessonGate';
 import { getModules } from '@/lib/data';
-import { videoSrcFor, posterFor } from '@/lib/video-src';
 import { lh } from '@/lib/href';
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }): Promise<Metadata> {
@@ -44,12 +43,9 @@ export default async function FreeLesson({ params: { locale } }: { params: { loc
       <div className="mt-10">
         {lesson ? (
           <Suspense fallback={<div className="aspect-video w-full animate-pulse rounded-2xl bg-ink/5" />}>
-            <FreeLessonGate
-              locale={locale}
-              src={videoSrcFor(lesson)}
-              poster={posterFor(lesson)}
-              title={ar ? lesson.title_ar : lesson.title_en}
-            />
+            {/* No src prop: the URL is fetched by a server action once the
+                email is in, so it never appears in this page's HTML. */}
+            <FreeLessonGate locale={locale} title={ar ? lesson.title_ar : lesson.title_en} />
           </Suspense>
         ) : (
           /*

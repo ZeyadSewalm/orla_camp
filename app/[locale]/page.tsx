@@ -6,7 +6,7 @@ import Reveal from '@/components/Reveal';
 import MagneticButton from '@/components/MagneticButton';
 import Curriculum from '@/components/Curriculum';
 import TierComparison from '@/components/TierComparison';
-import { getModules, getSiteSettings, getTiers } from '@/lib/data';
+import { getSiteSettings, getTiers } from '@/lib/data';
 import { lh } from '@/lib/href';
 import { seatsLeft } from '@/lib/pricing';
 
@@ -20,9 +20,11 @@ export default async function Home({ params: { locale } }: { params: { locale: s
   const t = await getTranslations('home');
   const f = await getTranslations('faq');
   const p = await getTranslations('pricing');
-  const [settings, modules, tiers] = await Promise.all([
+  // `modules` used to be fetched here and never read. It is a whole extra
+  // Supabase round trip on the site's busiest page, and since migration-007 it
+  // is a service-role read of the paid video columns for no reason at all.
+  const [settings, tiers] = await Promise.all([
     getSiteSettings(),
-    getModules(),
     getTiers()
   ]);
 

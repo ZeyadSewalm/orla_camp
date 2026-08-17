@@ -4,20 +4,16 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import VideoEmbed from './VideoEmbed';
-import { captureLead } from '@/app/[locale]/free-lesson/actions';
+import { captureLead, getFreeLessonSource } from '@/app/[locale]/free-lesson/actions';
 import { lh } from '@/lib/href';
 
 const STORAGE_KEY = 'orla_free_lesson_unlocked';
 
 export default function FreeLessonGate({
   locale,
-  src,
-  poster,
   title
 }: {
   locale: string;
-  src: string | null;
-  poster: string | null;
   title: string;
 }) {
   const t = useTranslations('free');
@@ -25,6 +21,8 @@ export default function FreeLessonGate({
   const params = useSearchParams();
 
   const [unlocked, setUnlocked] = useState(false);
+  // Fetched only after the gate opens — never rendered into the page's HTML.
+  const [video, setVideo] = useState<{ src: string | null; poster: string | null } | null>(null);
   const [ready, setReady] = useState(false);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -39,12 +37,24 @@ export default function FreeLessonGate({
    */
   useEffect(() => {
     try {
-      if (window.localStorage.getItem(STORAGE_KEY) === '1') setUnlocked(true);
+      if (window.localStorage.getItem(STORAGE_KEY) === '1') {
+        setUnlocked(true);
+        void loadVideo();
+      }
     } catch {
       // Private browsing blocks storage — just show the form.
     }
     setReady(true);
   }, []);
+
+  async function loadVideo() {
+    try {
+      const v = await getFreeLessonSource();
+      setVideo({ src: v.src, poster: v.poster });
+    } catch {
+      setVideo({ src: null, poster: null });
+    }
+  }
 
   async function submit() {
     const clean = email.trim().toLowerCase();
@@ -87,6 +97,7 @@ export default function FreeLessonGate({
       /* ignore */
     }
     setUnlocked(true);
+    await loadVideo();
     setBusy(false);
   }
 
@@ -97,7 +108,11 @@ export default function FreeLessonGate({
   if (unlocked) {
     return (
       <div className="space-y-6">
-        <VideoEmbed src={src} poster={poster} title={title} />
+        {video ? (
+          <VideoEmbed src={video.src} poster={video.poster} title={title} />
+        ) : (
+          <div className="aspect-video w-full animate-pulse rounded-2xl bg-ink/5" />
+        )}
 
         <div className="surface-card p-6">
           <h2 className="display text-lg">{t('nextTitle')}</h2>

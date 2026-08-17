@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     if (quote.currency !== 'EGP') return NextResponse.json({ error: 'paymob_is_egp_only' }, { status: 400 });
 
     const admin = createAdminClient();
-    const { data: payment } = await admin
+    const { data: payment, error: paymentError } = await admin
       .from('payments')
       .insert({
         user_id: profile.id,
@@ -31,15 +31,24 @@ export async function POST(request: NextRequest) {
       .select('id')
       .single();
 
+    // The insert can fail — a dropped connection, a constraint, RLS. Without
+    // this check the code carried on with `payment.id` and threw a
+    // TypeError, which surfaced to the buyer as a blank 400 instead of
+    // anything actionable.
+    if (paymentError || !payment) {
+      console.error('[checkout] could not create payment row:', paymentError);
+      return NextResponse.json({ error: 'could_not_start_checkout' }, { status: 500 });
+    }
+
     const checkout = await createPaymobCheckout({
       amountEgp: quote.amount,
-      merchantOrderId: payment!.id,
+      merchantOrderId: payment.id,
       email: profile.email,
       fullName: profile.full_name ?? 'Student'
     });
 
     // Paymob's own order id is what the webhook reports back.
-    await admin.from('payments').update({ provider_reference: checkout.orderId }).eq('id', payment!.id);
+    await admin.from('payments').update({ provider_reference: checkout.orderId }).eq('id', payment.id);
 
     return NextResponse.json({ url: checkout.url });
   } catch (e) {
