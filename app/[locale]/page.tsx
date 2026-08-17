@@ -88,15 +88,21 @@ export default async function Home({ params: { locale } }: { params: { locale: s
             )}
           </div>
 
-          <div className="relative hidden md:block">
-            {/*
-              The hero always shows the mark. The uploaded landing image used
-              to render here, which meant any stock photo saved in the admin
-              replaced the brand at the most important point on the site.
-              That image is still available for social previews and elsewhere;
-              it just no longer outranks the logo.
-            */}
-            <HeroMark className="h-[28rem] w-full max-w-[25rem]" />
+          {/*
+            VISIBLE ON EVERY SIZE.
+
+            This was `hidden md:block`, so the entire brand mark vanished on
+            phones and on any narrow desktop window — the hero became a wall of
+            text with no image at all, on the one screen most visitors actually
+            see. Hiding the logo is not a responsive strategy.
+
+            `order-first` on mobile puts the mark ABOVE the headline, which is
+            how the eye expects it; from `md` the grid takes over and it
+            returns to its column beside the copy. It is also smaller on a
+            phone so it introduces the page rather than filling it.
+          */}
+          <div className="relative order-first flex justify-center md:order-none md:block">
+            <HeroMark className="h-[15rem] w-full max-w-[15rem] sm:h-[19rem] sm:max-w-[19rem] md:h-[28rem] md:max-w-[25rem]" />
           </div>
         </div>
       </section>

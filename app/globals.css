@@ -334,6 +334,12 @@ html[lang='ar'] .display {
 }
 .float-mark { animation: floatMark 5.5s ease-in-out infinite; }
 
+/* An infinite motion loop is one of the clearest triggers for people with
+   vestibular sensitivity, and it also burns battery on a phone. */
+@media (prefers-reduced-motion: reduce) {
+  .float-mark { animation: none; }
+}
+
 @keyframes progress {
   from { transform: scaleX(0); }
   60%  { transform: scaleX(0.75); }
