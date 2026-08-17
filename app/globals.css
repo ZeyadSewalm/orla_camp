@@ -233,13 +233,26 @@ html[lang='ar'] .display {
      comparable number of lines rather than a comparable pixel value.
      ============================================================= */
 
-  .h-hero    { font-size: clamp(2rem, 6.4vw, 4.25rem); }
-  .h-section { font-size: clamp(1.75rem, 4.4vw, 3.5rem); }
-  .h-final   { font-size: clamp(1.875rem, 5.2vw, 4.25rem); }
+  /*
+   * SECOND PASS, after seeing both languages side by side on a real screen.
+   *
+   * The first pass only shrank Arabic. But the ENGLISH headline was oversized
+   * too: 98 characters at 5rem ran to five lines and filled the viewport on
+   * its own, so the subhead and both CTAs sat below the fold in BOTH
+   * languages. A sales page whose offer is invisible without scrolling is the
+   * expensive kind of broken.
+   *
+   * These maxima are set so the hero headline lands at three to four lines in
+   * English and four in Arabic at a normal laptop width, which leaves the
+   * subhead, the buttons and the seats line above the fold.
+   */
+  .h-hero    { font-size: clamp(1.875rem, 4.6vw, 3.25rem); }
+  .h-section { font-size: clamp(1.625rem, 3.4vw, 2.75rem); }
+  .h-final   { font-size: clamp(1.75rem, 4vw, 3.25rem); }
 
-  html[lang='ar'] .h-hero    { font-size: clamp(1.5rem, 4.1vw, 2.75rem); }
-  html[lang='ar'] .h-section { font-size: clamp(1.375rem, 3.1vw, 2.375rem); }
-  html[lang='ar'] .h-final   { font-size: clamp(1.5rem, 3.5vw, 2.75rem); }
+  html[lang='ar'] .h-hero    { font-size: clamp(1.5rem, 3.4vw, 2.5rem); }
+  html[lang='ar'] .h-section { font-size: clamp(1.375rem, 2.6vw, 2.125rem); }
+  html[lang='ar'] .h-final   { font-size: clamp(1.5rem, 3vw, 2.5rem); }
 
   /* Arabic headlines also need a slightly wider measure, because the lines
      cannot be broken as freely. */

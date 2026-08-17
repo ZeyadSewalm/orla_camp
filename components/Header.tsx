@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import Logo, { Wordmark } from './Logo';
+import Logo, { Wordmark, WordmarkInline } from './Logo';
 import LocaleSwitcher from './LocaleSwitcher';
 import LogoutButton from './LogoutButton';
 import { getSessionUser } from '@/lib/supabase/server';
@@ -35,9 +35,18 @@ export default async function Header({ locale }: { locale: string }) {
         <div className="soft-shadow mx-auto flex max-w-content items-center gap-2 rounded-full border border-ink/10 bg-paper/90 px-3 py-2 backdrop-blur-xl sm:gap-4 sm:px-4 sm:py-2.5 md:px-5">
           <Link href={lh(locale, ``)} className="flex min-w-0 items-center gap-2 sm:gap-2.5" aria-label="OrlaDent Camp">
             <Logo className="h-8 w-auto shrink-0 text-ink sm:h-9" />
-            {/* The name stays visible at every width — it is the brand. It is
-                the NAV LINKS that leave this bar on mobile, not the wordmark. */}
-            <Wordmark className="text-[0.6rem] sm:text-[0.72rem] md:text-[0.82rem]" />
+            {/*
+              The name is visible at EVERY width — but in two forms.
+
+              The three-line stack squeezed next to a 32px logo on a phone came
+              out as three rows of ~9px text: technically rendered, actually
+              unreadable, which is why the site still looked nameless on mobile
+              after the last fix. Below `sm` it now sets on ONE line at a size
+              you can actually read; the stacked lockup returns from `sm` up
+              where there is room for it.
+            */}
+            <WordmarkInline className="text-[0.78rem] tracking-[0.02em] sm:hidden" />
+            <Wordmark className="hidden sm:block sm:text-[0.72rem] md:text-[0.82rem]" />
           </Link>
 
           <nav className="ms-auto hidden items-center gap-1 text-sm md:flex">

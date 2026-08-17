@@ -39,3 +39,19 @@ export function Wordmark({ className = '', dir }: { className?: string; dir?: 'l
     </span>
   );
 }
+
+/**
+ * One-line wordmark, for the mobile header.
+ *
+ * The three-line stack is a lockup for large surfaces. Shrunk to fit beside a
+ * 32px logo in a phone header it becomes three rows of ~9px text — present in
+ * the DOM, but unreadable, which is why the site looked nameless on a phone.
+ * One line at a legible size says the name properly in the space available.
+ */
+export function WordmarkInline({ className = '' }: { className?: string }) {
+  return (
+    <span dir="ltr" className={['brand-wordmark block whitespace-nowrap uppercase', className].join(' ')}>
+      ORLADENT CAMP
+    </span>
+  );
+}

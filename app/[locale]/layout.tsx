@@ -9,6 +9,15 @@ import RouteProgress from '@/components/RouteProgress';
 import Footer from '@/components/Footer';
 import '../globals.css';
 
+/**
+ * Identifies this build in the served HTML. Vercel injects the commit SHA;
+ * locally it falls back to the timestamp of the build.
+ */
+const BUILD_ID =
+  process.env.NEXT_PUBLIC_BUILD_ID ??
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ??
+  `local-${new Date().toISOString().slice(0, 16)}`;
+
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
@@ -85,6 +94,18 @@ export default async function LocaleLayout({
           href={locale === 'ar' ? '/fonts/almarai-arabic-400.woff2' : '/fonts/inter-latin.woff2'}
           crossOrigin="anonymous"
         />
+
+        {/*
+          BUILD STAMP — so you can tell what is actually deployed.
+
+          Vercel keeps serving the previous build until a new one finishes, and
+          a phone will happily show a cached page for a long time after that.
+          That combination makes it very easy to look at an old site and think
+          a fix did not work. View source (or check the console) and read this
+          value: if it is not the build you just pushed, you are looking at an
+          old page, not a broken fix.
+        */}
+        <meta name="x-build" content={BUILD_ID} />
       </head>
       <body>
         <NextIntlClientProvider messages={messages}>
