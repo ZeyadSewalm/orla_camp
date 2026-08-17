@@ -37,16 +37,22 @@ export default function HeroMark({ className = '' }: { className?: string }) {
           give one. Positioning against the `relative` wrapper sidesteps the
           whole problem: the box is whatever size flex made the wrapper.
 
-          This is real 3D — perspective + preserve-3d + a mirrored back face —
-          but it is CSS, so it composites on the GPU and costs no JavaScript.
-          The three.js version of this mark that used to sit unused in the
-          project cost 600 KB before drawing a single frame.
+          This is real 3D — perspective + preserve-3d — but it is CSS, so it
+          composites on the GPU and costs no JavaScript. The three.js version
+          of this mark that used to sit unused in the project cost 600 KB
+          before drawing a single frame.
+
+          ONE FACE, NOT TWO. The full 360° spin needed a mirrored back face,
+          because the mark turned away from the viewer for half of every
+          rotation and went paper-thin twice a cycle. The tilt never passes
+          ±20°, so the back is never seen — which means the second SVG, its
+          drop-shadow filter and its backface-visibility handling can all go.
+          The eagle now faces the reader the entire time.
         */}
         <div className="relative flex min-h-0 flex-1 items-center justify-center self-stretch">
           <div className="float-mark mark-3d absolute inset-0">
             <div className="mark-3d-inner">
               <Logo className="mark-3d-face text-white drop-shadow-[0_18px_0_rgba(26,26,26,0.16)]" />
-              <Logo className="mark-3d-face mark-3d-back text-white drop-shadow-[0_18px_0_rgba(26,26,26,0.16)]" />
             </div>
           </div>
         </div>
