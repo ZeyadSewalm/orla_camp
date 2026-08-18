@@ -59,9 +59,21 @@ export async function generateMetadata({ params: { locale } }: { params: { local
     openGraph: {
       title, description, url: `${site}${lh(locale)}`, siteName: title,
       locale: locale === 'ar' ? 'ar_EG' : 'en_US',
-      images: [{ url: '/logo/orladent-logo.svg', width: 543, height: 937, alt: title }]
+      /*
+       * PNG, 1200x630 — not the logo SVG.
+       *
+       * WhatsApp, Facebook, LinkedIn and X do not render SVG previews. Every
+       * time someone shared this link the card came up blank, and on WhatsApp
+       * — which is how this audience actually shares things — that is the
+       * first impression of a product costing five figures in EGP.
+       *
+       * 1200x630 is also the shape `summary_large_image` expects. The old
+       * asset was 543x937, portrait: even as a PNG it would have been cropped
+       * to a sliver.
+       */
+      images: [{ url: '/og-image.png', width: 1200, height: 630, alt: title }]
     },
-    twitter: { card: 'summary_large_image', title, description, images: ['/logo/orladent-logo.svg'] },
+    twitter: { card: 'summary_large_image', title, description, images: ['/og-image.png'] },
     icons: { icon: '/logo/orladent-logo.svg' }
   };
 }

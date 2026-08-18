@@ -197,6 +197,47 @@ async function Modules({ db, t }: { db: DB; t: { save: string; add: string; del:
     <div className="space-y-6">
       <Card><h2 className="mb-5 font-display text-lg font-bold">New module</h2>{form()}</Card>
 
+      {/*
+        FREE LESSON STATUS — tells you what /free-lesson is actually serving.
+
+        The page shows whichever flagged module comes FIRST by order_index, so
+        ticking "free preview" on three modules quietly publishes only one of
+        them and hides the other two. Without this banner the only way to find
+        out was to open the public page and guess.
+      */}
+      {(() => {
+        const free = (modules ?? []).filter((m) => m.is_free_preview);
+        const live = free[0];
+        return (
+          <Card className={live ? '' : 'border-brass'}>
+            <p className="label mb-2">Free lesson — what /free-lesson is serving</p>
+            {!live ? (
+              <p className="text-sm text-steel">
+                No module is flagged as the free preview, so the public page shows
+                “coming soon”. Tick <strong>Free preview</strong> on the module you want to give away.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm">
+                  <strong>{live.title_en}</strong>{' '}
+                  {live.video_source === 'bunny' && live.bunny_video_id
+                    ? '— Bunny video attached'
+                    : live.video_link
+                      ? '— Drive link attached'
+                      : '— ⚠ no video attached, the page will show an empty player'}
+                </p>
+                {free.length > 1 && (
+                  <p className="mt-2 text-sm text-brass">
+                    ⚠ {free.length} modules are flagged free. Only the first by order_index
+                    ({live.title_en}) is published; the rest are ignored.
+                  </p>
+                )}
+              </>
+            )}
+          </Card>
+        );
+      })()}
+
       {(modules ?? []).length === 0 && <Empty title={t.emptyModules}>{t.emptyModulesBody}</Empty>}
 
       {(modules ?? []).map((m) => (

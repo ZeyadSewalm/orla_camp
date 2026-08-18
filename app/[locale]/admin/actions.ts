@@ -30,6 +30,10 @@ function done() {
   revalidatePath('/[locale]', 'page');
   revalidatePath('/[locale]/pricing', 'page');
   revalidatePath('/[locale]/course', 'page');
+  // The free lesson reads the same modules table. Without this, flagging a
+  // module as the free preview left /free-lesson serving its prerendered HTML
+  // — you'd save in the admin, reload, and still see "coming soon".
+  revalidatePath('/[locale]/free-lesson', 'page');
 }
 
 /* ---------------- students ---------------- */

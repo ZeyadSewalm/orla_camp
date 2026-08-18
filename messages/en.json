@@ -175,7 +175,7 @@
     "q3": "Is this the same training OrlaDent's design team actually uses?",
     "a3": "Yes — this is Badr's own production workflow, the one behind cases OrlaDent delivers to clients today. Nothing here is theoretical.",
     "q4": "Do you offer payment plans?",
-    "a4": "Yes, on Foundation and Freelance Ready — 3 installments, no extra fee. Production Partner pricing is set individually with each pilot student.",
+    "a4": "Yes, on Foundation and Freelance Ready — 3 instalments. Paying in instalments comes to about 10% more than paying in full; both figures are printed next to every plan so you can do the maths before you choose. Production Partner pricing is set individually with each pilot student.",
     "q5": "Is there a certificate?",
     "a5": "No. No tier includes an accredited certificate, and we don't sell the camp as one that does."
   },
@@ -271,7 +271,7 @@
     "language": "العربية"
   },
   "free": {
-    "metaTitle": "Free lesson — OrlaDent Camp",
+    "metaTitle": "Free lesson",
     "metaDescription": "Watch a full module from the camp, free. No card, no account.",
     "kicker": "Free lesson",
     "title": "A full module, free",

@@ -8,6 +8,9 @@ import { lh } from '@/lib/href';
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: 'free' });
+  // Just the page name. The root layout's title template appends
+  // " — OrlaDent Camp", so including it here produced the doubled
+  // "درس مجاني — OrlaDent Camp — OrlaDent Camp" visible in the live tab title.
   return { title: t('metaTitle'), description: t('metaDescription') };
 }
 
