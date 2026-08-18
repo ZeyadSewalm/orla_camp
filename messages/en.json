@@ -34,7 +34,7 @@
     "statusComing": "Coming in your access period",
     "curriculumFooter": "All modules ship to your account as they're released — lifetime access means you're never locked out of new content.",
     "comparisonTitle": "Tier comparison",
-    "comparisonNote": "No tier includes a certificate — OrlaDent Camp isn't able to issue one for the foreseeable future. What replaces it is stronger: real QC review of your case files, by OrlaDent's own team.",
+    "comparisonNote": "What you get instead is stronger: real QC review of your case files, by OrlaDent's own team.",
     "partnerNote": "Production Partner is capped at 3 seats for the first cohort — this is a live stress test of the mentorship format before it's offered at scale. Anyone interested should expect a conversation with Badr before enrolling, not a self-checkout.",
     "includedTitle": "What's included",
     "included1": "Every module, from your first margin line to full-arch implant cases",
@@ -43,7 +43,6 @@
     "included4": "A community of dentists and techs learning the same system, not a solo download",
     "included5": "Direct access to Badr for the questions a video can't answer",
     "pricingTitle": "Pricing + payment plans",
-    "pricing1": "We price by region, not by one flat number — because a fair price in Cairo and a fair price in Dubai aren't the same number, and we're not going to pretend they are.",
     "pricing2": "Every tier is available on a payment plan. Pick what works for your budget, not just your ambition.",
     "finalTitle": "Learn the workflow. Keep the control.",
     "finalBody": "You can keep sending your hardest cases somewhere else and hoping they come back right — or you can learn to design them yourself, taught by the team labs across the US and Europe already trust with theirs.",
@@ -62,7 +61,6 @@
     "seatsLeft": "{count} seats left",
     "seatsFull": "All seats are taken right now",
     "ppNote": "Production Partner is limited to 3 seats — it's a pilot, and every interested student has an intro call with Badr before enrolling.",
-    "noCert": "No plan includes an accredited certificate.",
     "pilotBadge": "3 seats only — pilot cohort"
   },
   "apply": {
@@ -175,9 +173,7 @@
     "q3": "Is this the same training OrlaDent's design team actually uses?",
     "a3": "Yes — this is Badr's own production workflow, the one behind cases OrlaDent delivers to clients today. Nothing here is theoretical.",
     "q4": "Do you offer payment plans?",
-    "a4": "Yes, on Foundation and Freelance Ready — 3 instalments. Paying in instalments comes to about 10% more than paying in full; both figures are printed next to every plan so you can do the maths before you choose. Production Partner pricing is set individually with each pilot student.",
-    "q5": "Is there a certificate?",
-    "a5": "No. No tier includes an accredited certificate, and we don't sell the camp as one that does."
+    "a4": "Yes, on Foundation and Freelance Ready — 3 instalments. Paying in instalments comes to about 10% more than paying in full; both figures are printed next to every plan so you can do the maths before you choose. Production Partner pricing is set individually with each pilot student."
   },
   "admin": {
     "title": "Admin",
@@ -290,6 +286,6 @@
     "nextBody": "The camp covers basics through full-arch implant cases, with a checklist for every module and a QC review on your own case files.",
     "seePlans": "See the plans",
     "readFaq": "Read the FAQ",
-    "comingSoon": "The free lesson is being finalised. The plans below are live in the meantime — and no plan includes an accredited certificate."
+    "comingSoon": "The free lesson is being finalised. The plans below are live in the meantime."
   }
 }

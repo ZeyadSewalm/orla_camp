@@ -43,7 +43,8 @@ export default async function Home({ params: { locale } }: { params: { locale: s
   };
 
   const included = [t('included1'), t('included2'), t('included3'), t('included4'), t('included5')];
-  const faqs = [1, 2, 3, 4, 5].map((n) => [f(`q${n}` as 'q1'), f(`a${n}` as 'a1')]);
+  // Four questions now — the certificate Q&A was removed on request.
+  const faqs = [1, 2, 3, 4].map((n) => [f(`q${n}` as 'q1'), f(`a${n}` as 'a1')]);
 
   return (
     <>
@@ -207,8 +208,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       {/* ── 7. PRICING + PAYMENT PLANS ── */}
       <section className="mx-auto max-w-content px-5 py-20">
         <Reveal as="h2" className="display h-section">{t('pricingTitle')}</Reveal>
-        <div className="mt-8 grid max-w-4xl gap-6 md:grid-cols-2">
-          <p className="leading-relaxed text-steel">{t('pricing1')}</p>
+        <div className="mt-8 grid max-w-4xl gap-6">
           <p className="leading-relaxed text-steel">{t('pricing2')}</p>
         </div>
         <MagneticButton href={lh(locale, '/pricing')} className="btn-brass mt-9">{p('subscribe')}</MagneticButton>

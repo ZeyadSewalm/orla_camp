@@ -44,7 +44,6 @@ export default async function Pricing({ params: { locale } }: { params: { locale
 
       <div className="surface-card mt-10 space-y-3 p-6 text-sm text-steel">
         <p className="border-s-2 border-brass ps-4">{t('ppNote')}</p>
-        <p className="border-s-2 border-ink/30 ps-4">{t('noCert')}</p>
       </div>
     </div>
   );
