@@ -941,21 +941,21 @@ async function Leads({ db, locale }: { db: DB; locale: string }) {
         <Stat label={ar ? 'آخر 7 أيام' : 'Last 7 days'} value={String(since(7))} />
         <Stat label={ar ? 'آخر 30 يوم' : 'Last 30 days'} value={String(since(30))} />
         <Stat
-          label={ar ? 'اشتركوا بعدها' : 'Became students'}
+          label={ar ? 'تحوّلوا إلى مشتركين' : 'Became students'}
           value={rows.length ? `${converted} (${Math.round((converted / rows.length) * 100)}%)` : '0'}
         />
       </div>
 
       {rows.length === 0 ? (
-        <Empty title={ar ? 'لسه محدش سجّل' : 'No leads yet'}>
+        <Empty title={ar ? 'لا توجد تسجيلات بعد' : 'No leads yet'}>
           {ar
-            ? 'أول ما حد يكتب إيميله في صفحة الدرس المجاني هيظهر هنا.'
+            ? 'سيظهر هنا كل من يُدخل بريده في صفحة الدرس المجاني.'
             : 'Anyone who enters their email on the free lesson page shows up here.'}
         </Empty>
       ) : (
         <Card>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="label">{ar ? 'كل اللي سجّلوا' : 'Everyone who signed up'}</p>
+            <p className="label">{ar ? 'جميع المسجّلين' : 'Everyone who signed up'}</p>
             {/*
               A plain mailto with every address in BCC — no export step, no
               spreadsheet, no third-party tool. BCC and not To: putting a
@@ -966,7 +966,7 @@ async function Leads({ db, locale }: { db: DB; locale: string }) {
               href={`mailto:?bcc=${rows.map((r: any) => r.email).join(',')}&subject=${encodeURIComponent('OrlaDent Camp')}`}
               className="btn-quiet text-xs"
             >
-              {ar ? 'ابعت لكلهم (BCC)' : 'Email all (BCC)'}
+              {ar ? 'مراسلة الجميع (نسخة مخفية)' : 'Email all (BCC)'}
             </a>
           </div>
 
@@ -978,7 +978,7 @@ async function Leads({ db, locale }: { db: DB; locale: string }) {
                   <th className="py-3 pe-4 text-start">{ar ? 'الاسم' : 'Name'}</th>
                   <th className="py-3 pe-4 text-start">{ar ? 'المصدر' : 'Source'}</th>
                   <th className="py-3 pe-4 text-start">{ar ? 'التاريخ' : 'Date'}</th>
-                  <th className="py-3 pe-4 text-start">{ar ? 'اشترك؟' : 'Student?'}</th>
+                  <th className="py-3 pe-4 text-start">{ar ? 'مشترك؟' : 'Student?'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -994,7 +994,7 @@ async function Leads({ db, locale }: { db: DB; locale: string }) {
                     <td className="py-3 pe-4 text-xs text-steel">{fmt(r.created_at)}</td>
                     <td className="py-3 pe-4">
                       {paidEmails.has(String(r.email).toLowerCase())
-                        ? <Pill tone="ok">{ar ? 'أيوه' : 'yes'}</Pill>
+                        ? <Pill tone="ok">{ar ? 'نعم' : 'yes'}</Pill>
                         : <Pill tone="mute">—</Pill>}
                     </td>
                   </tr>

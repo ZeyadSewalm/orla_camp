@@ -11,7 +11,7 @@ export default function NotFound() {
       <p className="figure text-xs uppercase tracking-[0.2em] text-steel">404</p>
 
       <h1 className="display text-2xl">
-        الصفحة دي مش موجودة
+        هذه الصفحة غير موجودة
         <span className="mt-2 block text-lg text-steel">This page doesn&apos;t exist</span>
       </h1>
 

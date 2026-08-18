@@ -31,18 +31,18 @@ export default function Error({
       <p className="figure text-xs uppercase tracking-[0.2em] text-steel">Error</p>
 
       <h1 className="display text-2xl">
-        حصلت مشكلة مؤقتة
+        حدث خطأ مؤقت
         <span className="mt-2 block text-lg text-steel">Something went wrong</span>
       </h1>
 
       <p className="text-sm leading-relaxed text-steel">
-        جرّب تاني — لو المشكلة فضلت، كلّمنا وإحنا نظبطها.
+        أعد المحاولة — وإن استمرّت المشكلة فتواصل معنا وسنعالجها.
         <span className="mt-1 block">Try again — if it keeps happening, get in touch and we&apos;ll sort it.</span>
       </p>
 
       <div className="flex flex-col gap-3 xs:flex-row">
         <button type="button" onClick={reset} className="btn-primary justify-center">
-          جرّب تاني / Try again
+          أعد المحاولة / Try again
         </button>
         <a href="/" className="btn-quiet justify-center">
           الصفحة الرئيسية / Home

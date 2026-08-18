@@ -80,7 +80,7 @@ export default function TierComparison({
             <h3 className="display text-lg">{ar ? tier.name_ar : tier.name_en}</h3>
             {tier.max_seats !== null && (
               <p className="mt-1 text-xs font-semibold text-brass">
-                {ar ? `تجريبي — ${tier.max_seats} أماكن فقط` : `pilot — ${tier.max_seats} seats only`}
+                {ar ? `دفعة تجريبية — ${tier.max_seats} مقاعد فقط` : `pilot — ${tier.max_seats} seats only`}
               </p>
             )}
 
@@ -127,7 +127,7 @@ export default function TierComparison({
                   {ar ? tier.name_ar : tier.name_en}
                   {tier.max_seats !== null && (
                     <em className="block text-xs font-normal not-italic text-brass">
-                      {ar ? `تجريبي — ${tier.max_seats} أماكن فقط` : `pilot — ${tier.max_seats} seats only`}
+                      {ar ? `دفعة تجريبية — ${tier.max_seats} مقاعد فقط` : `pilot — ${tier.max_seats} seats only`}
                     </em>
                   )}
                 </th>
