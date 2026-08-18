@@ -69,6 +69,7 @@ export default async function Admin({
         <div className="min-w-0">
           {tab === 'dashboard' && <Dashboard db={db} locale={locale} t={t} />}
           {tab === 'students' && <Students db={db} locale={locale} save={save} studentId={searchParams.student} t={t} />}
+          {tab === 'leads' && <Leads db={db} locale={locale} />}
           {tab === 'payments' && <Payments db={db} locale={locale} t={t} />}
           {tab === 'modules' && <Modules db={db} t={crud} />}
           {tab === 'qc' && <QC db={db} save={save} locale={locale} caseId={searchParams.case} t={t} />}
@@ -890,5 +891,119 @@ async function Payments({ db, locale, t }: { db: DB; locale: string; t: any }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+
+/* ================= LEADS ================= */
+/**
+ * Everyone who asked for the free lesson.
+ *
+ * The lead magnet was collecting these into the `leads` table and nothing in
+ * the product ever showed them — the only way to read your own list was to
+ * open the Supabase SQL editor. A list you cannot see is a list you will not
+ * use, which defeats the point of gating the lesson at all.
+ *
+ * Read here with the service-role client. `leads` has RLS on and no public
+ * policy, so this data can only ever be reached from the server.
+ */
+async function Leads({ db, locale }: { db: DB; locale: string }) {
+  const ar = locale === 'ar';
+
+  const { data: leads } = await db
+    .from('leads')
+    .select('id,email,full_name,region,source,utm_source,utm_campaign,created_at')
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  const rows = leads ?? [];
+
+  // Which of these later became paying students — the number that tells you
+  // whether the free lesson is doing its job.
+  const { data: paidProfiles } = await db.from('profiles').select('email').eq('has_access', true);
+  const paidEmails = new Set((paidProfiles ?? []).map((p: any) => String(p.email).toLowerCase()));
+  const converted = rows.filter((r: any) => paidEmails.has(String(r.email).toLowerCase())).length;
+
+  const since = (days: number) => {
+    const cut = Date.now() - days * 86400000;
+    return rows.filter((r: any) => new Date(r.created_at).getTime() >= cut).length;
+  };
+
+  const fmt = (iso: string) =>
+    new Intl.DateTimeFormat(ar ? 'ar-EG-u-nu-latn' : 'en-GB', {
+      dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Cairo'
+    }).format(new Date(iso));
+
+  return (
+    <>
+      <div className="mb-6 grid grid-cols-1 gap-3 xs:grid-cols-2 lg:grid-cols-4">
+        <Stat label={ar ? 'الإجمالي' : 'Total'} value={String(rows.length)} />
+        <Stat label={ar ? 'آخر 7 أيام' : 'Last 7 days'} value={String(since(7))} />
+        <Stat label={ar ? 'آخر 30 يوم' : 'Last 30 days'} value={String(since(30))} />
+        <Stat
+          label={ar ? 'اشتركوا بعدها' : 'Became students'}
+          value={rows.length ? `${converted} (${Math.round((converted / rows.length) * 100)}%)` : '0'}
+        />
+      </div>
+
+      {rows.length === 0 ? (
+        <Empty title={ar ? 'لسه محدش سجّل' : 'No leads yet'}>
+          {ar
+            ? 'أول ما حد يكتب إيميله في صفحة الدرس المجاني هيظهر هنا.'
+            : 'Anyone who enters their email on the free lesson page shows up here.'}
+        </Empty>
+      ) : (
+        <Card>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="label">{ar ? 'كل اللي سجّلوا' : 'Everyone who signed up'}</p>
+            {/*
+              A plain mailto with every address in BCC — no export step, no
+              spreadsheet, no third-party tool. BCC and not To: putting a
+              customer list in a visible To: field leaks every address to
+              every recipient.
+            */}
+            <a
+              href={`mailto:?bcc=${rows.map((r: any) => r.email).join(',')}&subject=${encodeURIComponent('OrlaDent Camp')}`}
+              className="btn-quiet text-xs"
+            >
+              {ar ? 'ابعت لكلهم (BCC)' : 'Email all (BCC)'}
+            </a>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[40rem] text-sm">
+              <thead>
+                <tr className="border-b border-ink/20 text-start">
+                  <th className="py-3 pe-4 text-start">{ar ? 'الإيميل' : 'Email'}</th>
+                  <th className="py-3 pe-4 text-start">{ar ? 'الاسم' : 'Name'}</th>
+                  <th className="py-3 pe-4 text-start">{ar ? 'المصدر' : 'Source'}</th>
+                  <th className="py-3 pe-4 text-start">{ar ? 'التاريخ' : 'Date'}</th>
+                  <th className="py-3 pe-4 text-start">{ar ? 'اشترك؟' : 'Student?'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r: any) => (
+                  <tr key={r.id} className="border-b border-line">
+                    <td className="py-3 pe-4">
+                      <a href={`mailto:${r.email}`} className="text-brass underline">{r.email}</a>
+                    </td>
+                    <td className="py-3 pe-4">{r.full_name || '—'}</td>
+                    <td className="py-3 pe-4 text-xs text-steel">
+                      {r.utm_campaign || r.utm_source || r.source || '—'}
+                    </td>
+                    <td className="py-3 pe-4 text-xs text-steel">{fmt(r.created_at)}</td>
+                    <td className="py-3 pe-4">
+                      {paidEmails.has(String(r.email).toLowerCase())
+                        ? <Pill tone="ok">{ar ? 'أيوه' : 'yes'}</Pill>
+                        : <Pill tone="mute">—</Pill>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+    </>
   );
 }

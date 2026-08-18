@@ -7,7 +7,10 @@ const nextConfig = {
   images: {
     remotePatterns: [
       // Supabase Storage (landing image, checklists). Replace <project-ref>.
-      { protocol: 'https', hostname: '**.supabase.co' }
+      { protocol: 'https', hostname: '**.supabase.co' },
+      // Drive-generated video posters (see lib/drive.ts driveThumbnail)
+      { protocol: 'https', hostname: 'drive.google.com' },
+      { protocol: 'https', hostname: '**.b-cdn.net' }
     ]
   },
 

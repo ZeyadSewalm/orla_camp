@@ -262,7 +262,8 @@
     "emptyPaymentsBody": "The first successful payment lands here automatically.",
     "notFoundBody": "That student doesn't exist — they may have been deleted.",
     "emptyModules": "No modules yet",
-    "emptyModulesBody": "Add your first one using the form above."
+    "emptyModulesBody": "Add your first one using the form above.",
+    "leads": "Leads"
   },
   "common": {
     "loading": "One moment…",

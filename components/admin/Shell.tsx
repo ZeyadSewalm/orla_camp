@@ -6,7 +6,7 @@ import {
 import { lh } from '@/lib/href';
 
 export const TABS = [
-  'dashboard', 'students', 'payments', 'modules', 'qc', 'tiers',
+  'dashboard', 'students', 'leads', 'payments', 'modules', 'qc', 'tiers',
   'requests', 'sessions', 'community', 'promos', 'content'
 ] as const;
 export type Tab = (typeof TABS)[number];
@@ -16,6 +16,7 @@ export const REVIEWER_TABS: Tab[] = ['qc'];
 const ICONS: Record<Tab, typeof Users> = {
   dashboard: LayoutDashboard,
   students: Users,
+  leads: Inbox,
   payments: CreditCard,
   modules: PlayCircle,
   qc: ClipboardCheck,
@@ -29,7 +30,7 @@ const ICONS: Record<Tab, typeof Users> = {
 
 const GROUPS: Array<{ heading: string; tabs: Tab[] }> = [
   { heading: 'overview', tabs: ['dashboard'] },
-  { heading: 'people', tabs: ['students', 'payments', 'requests'] },
+  { heading: 'people', tabs: ['students', 'leads', 'payments', 'requests'] },
   { heading: 'course', tabs: ['modules', 'qc', 'sessions'] },
   { heading: 'selling', tabs: ['tiers', 'promos', 'content', 'community'] }
 ];

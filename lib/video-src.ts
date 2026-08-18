@@ -1,5 +1,5 @@
 import { signedEmbedUrl, bunnyThumbnail } from '@/lib/bunny';
-import { driveEmbedUrl } from '@/lib/drive';
+import { driveEmbedUrl, driveThumbnail } from '@/lib/drive';
 
 type VideoModule = {
   video_source: string | null;
@@ -28,7 +28,12 @@ export function videoSrcFor(m: VideoModule): string | null {
 }
 
 export function posterFor(m: VideoModule): string | null {
+  // Order matters: an explicitly uploaded image is a deliberate choice and
+  // always wins over anything generated.
   if (m.thumbnail_url) return m.thumbnail_url;
   if (m.video_source === 'bunny' && m.bunny_video_id) return bunnyThumbnail(m.bunny_video_id);
+  // Drive makes a thumbnail for every video it holds. Without this, every
+  // Drive module with no uploaded image showed a black rectangle.
+  if (m.video_link) return driveThumbnail(m.video_link);
   return null;
 }
