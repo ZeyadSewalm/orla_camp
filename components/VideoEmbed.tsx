@@ -69,18 +69,31 @@ export default function VideoEmbed({
           // Plain img on purpose: these are third-party poster URLs of unknown
           // dimensions, and they are already behind a click.
           // eslint-disable-next-line @next/next/no-img-element
+          /*
+            object-CONTAIN, not cover.
+            
+            `cover` crops the poster to fill the frame, but the Drive player
+            letterboxes instead — so the still and the video showed different
+            framings, and pressing play made the picture visibly jump and
+            shrink. `contain` letterboxes the poster the same way the player
+            does, so the still is an exact preview of the first frame and
+            nothing moves on click.
+          */
           <img
             src={poster}
             alt=""
             loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover opacity-60 transition duration-500 group-hover:scale-[1.03] group-hover:opacity-80"
+            className="absolute inset-0 h-full w-full object-contain opacity-70 transition duration-500 group-hover:opacity-90"
           />
         )}
 
-        {/* Keeps the play button readable over a bright or busy poster. */}
+        {/* Keeps the play button readable over a bright or busy poster.
+            Radial so it darkens only behind the button, rather than dimming
+            the letterbox bars that `contain` now leaves. */}
         <span
           aria-hidden
-          className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/10 to-transparent"
+          className="absolute inset-0"
+          style={{ background: 'radial-gradient(closest-side, rgba(26,26,26,0.55), rgba(26,26,26,0) 70%)' }}
         />
 
         <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white/95 shadow-lg transition duration-300 group-hover:scale-110 group-hover:bg-brass">
@@ -109,16 +122,28 @@ export default function VideoEmbed({
       {isDrive && (
         <span
           aria-hidden
-          // `right-0`, NOT `end-0`. The logical property flips to the left in
-          // Arabic, but the button being covered belongs to Drive's own LTR
-          // interface inside the iframe — it is on the physical right in both
-          // languages. On the Arabic page `end-0` would have covered an empty
-          // corner and left the pop-out button fully visible.
-          //
-          // Sized to the button plus a margin. Black because it has to vanish
-          // against the player's own chrome, which is always black.
-          className="pointer-events-auto absolute right-0 top-0 h-14 w-16 cursor-default bg-black"
+          /*
+           * `right-0`, NOT `end-0`. The logical property flips to the left in
+           * Arabic, but the button being covered belongs to Drive's own LTR
+           * interface inside the iframe — it sits on the physical right in
+           * both languages.
+           *
+           * A GRADIENT, not a flat rectangle. The first version was a solid
+           * black block, which vanished against the player's chrome but read
+           * as a cut-out square the moment a bright frame was underneath it —
+           * exactly what it looked like over the crown on the poster. Fading
+           * to transparent reads as a corner vignette instead, so there is
+           * nothing to notice. It still swallows the click either way.
+           *
+           * Smaller on phones, where Drive draws a smaller button and a big
+           * patch would eat real picture.
+           */
           onClick={(e) => e.preventDefault()}
+          className="pointer-events-auto absolute right-0 top-0 h-12 w-14 cursor-default sm:h-14 sm:w-16"
+          style={{
+            background:
+              'radial-gradient(120% 120% at 100% 0%, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.92) 45%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0) 100%)'
+          }}
         />
       )}
     </div>

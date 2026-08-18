@@ -108,11 +108,26 @@ export default function FreeLessonGate({
   if (unlocked) {
     return (
       <div className="space-y-6">
-        {video ? (
-          <VideoEmbed src={video.src} poster={video.poster} title={title} />
-        ) : (
-          <div className="aspect-video w-full animate-pulse rounded-2xl bg-ink/5" />
-        )}
+        {/*
+          FULL-BLEED ON PHONES.
+
+          The page has 20px of side padding, so on a 390px screen the video was
+          rendering 350px wide — and because this particular film is ultrawide,
+          Drive letterboxes it inside that, leaving a picture roughly 150px
+          tall. Nobody can judge a crown margin at 150px.
+
+          The negative margin cancels the page padding for this element only,
+          so the video runs edge to edge and gains about 12% width, and the
+          square corners at that width look deliberate rather than cramped.
+          From `sm` up the padding and the rounding come back.
+        */}
+        <div className="-mx-5 sm:mx-0 [&>*]:rounded-none sm:[&>*]:rounded-2xl">
+          {video ? (
+            <VideoEmbed src={video.src} poster={video.poster} title={title} />
+          ) : (
+            <div className="aspect-video w-full animate-pulse bg-ink/5 sm:rounded-2xl" />
+          )}
+        </div>
 
         <div className="surface-card p-6">
           <h2 className="display text-lg">{t('nextTitle')}</h2>
