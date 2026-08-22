@@ -288,5 +288,10 @@
     "seePlans": "See the plans",
     "readFaq": "Read the FAQ",
     "comingSoon": "The free lesson is being finalised. The plans below are live in the meantime."
+  },
+  "studentDashboardWelcome": {
+    "welcomeBack": "Welcome back, {name} 👋",
+    "readyToLearn": "Ready to keep learning?",
+    "studentFallback": "Student"
   }
 }

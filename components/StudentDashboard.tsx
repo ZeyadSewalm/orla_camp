@@ -7,9 +7,9 @@ import {
   FileCheck2,
   PlayCircle,
   RotateCcw,
-  Sparkles
 } from 'lucide-react';
 import type { CourseModule, LessonProgress } from '@/lib/types';
+import StudentWelcome from '@/components/StudentWelcome';
 import { lh } from '@/lib/href';
 
 type Activity = {
@@ -19,15 +19,6 @@ type Activity = {
   meta: string;
   at: string;
 };
-
-function initials(name: string) {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || '?';
-}
 
 function formatWatchTime(seconds: number, locale: string) {
   const safe = Math.max(0, Math.floor(seconds));
@@ -96,8 +87,6 @@ export default function StudentDashboard({
 
   const labels = ar
     ? {
-        welcome: `مرحبًا بعودتك، ${name} 👋`,
-        sub: 'جاهز تكمل رحلة التعلم؟',
         progress: 'تقدمك في الكورس',
         completed: 'مكتمل',
         lessonsCompleted: 'دروس مكتملة',
@@ -114,8 +103,6 @@ export default function StudentDashboard({
         noCourses: 'لا توجد دروس متاحة للتعلّم في الكورس حاليًا.'
       }
     : {
-        welcome: `Welcome back, ${name} 👋`,
-        sub: 'Ready to keep learning?',
         progress: 'Course progress',
         completed: 'completed',
         lessonsCompleted: 'Completed lessons',
@@ -140,33 +127,11 @@ export default function StudentDashboard({
 
   return (
     <section aria-labelledby="student-dashboard-title" className="space-y-6 md:space-y-8">
-      <div className="relative overflow-hidden rounded-[2rem] border border-ink/10 bg-white p-5 soft-shadow sm:p-7 md:p-8">
-        <div aria-hidden className="absolute -end-12 -top-12 h-40 w-40 rounded-full bg-brass/10 blur-2xl" />
-        <div className="relative flex items-center gap-4 sm:gap-5">
-          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-brass/15 bg-brass/10 sm:h-16 sm:w-16">
-            {avatarUrl ? (
-              // Auth-provider avatars have dynamic hosts, so a plain img avoids
-              // adding a broad remoteImages allowlist to Next config.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <span className="flex h-full w-full items-center justify-center font-display text-lg font-black text-brass">
-                {initials(name)}
-              </span>
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-2 text-brass">
-              <Sparkles aria-hidden className="h-4 w-4" />
-              <span className="text-xs font-semibold">{email}</span>
-            </div>
-            <h1 id="student-dashboard-title" className="font-display text-xl font-black leading-tight sm:text-2xl">
-              {labels.welcome}
-            </h1>
-            <p className="mt-2 text-sm text-steel sm:text-base">{labels.sub}</p>
-          </div>
-        </div>
-      </div>
+      <StudentWelcome
+        initialName={name}
+        initialEmail={email}
+        initialAvatarUrl={avatarUrl}
+      />
 
       {!progressAvailable && (
         <div role="status" className="rounded-2xl border border-brandGold/25 bg-brandGold/10 px-4 py-3 text-xs text-steel sm:text-sm">

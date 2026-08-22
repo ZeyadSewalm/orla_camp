@@ -288,5 +288,10 @@
     "seePlans": "اطّلع على الباقات",
     "readFaq": "الأسئلة الشائعة",
     "comingSoon": "الدرس المجاني قيد الإعداد. والباقات متاحة في هذه الأثناء."
+  },
+  "studentDashboardWelcome": {
+    "welcomeBack": "مرحبًا بعودتك، {name} 👋",
+    "readyToLearn": "جاهز تكمل رحلة التعلم؟",
+    "studentFallback": "طالب"
   }
 }
