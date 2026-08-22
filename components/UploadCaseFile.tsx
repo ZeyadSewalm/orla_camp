@@ -1,9 +1,11 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
 
 export default function UploadCaseFile({ moduleId, userId }: { moduleId: string; userId: string }) {
+  const router = useRouter();
   const t = useTranslations('course');
   const c = useTranslations('common');
   const [state, setState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
@@ -20,7 +22,15 @@ export default function UploadCaseFile({ moduleId, userId }: { moduleId: string;
     const { error } = await supabase.from('case_file_submissions').insert({
       user_id: userId, module_id: moduleId, file_url: path, file_name: file.name, status: 'pending'
     });
-    setState(error ? 'error' : 'done');
+    if (error) {
+      // Avoid leaving an orphaned private file if the metadata row fails.
+      await supabase.storage.from('case-files').remove([path]);
+      setState('error');
+      return;
+    }
+
+    setState('done');
+    router.refresh();
   }
 
   if (state === 'done') return <p className="text-sm text-brass">{t('uploaded')}</p>;

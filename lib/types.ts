@@ -28,7 +28,7 @@ export interface Profile {
   region: Region;
   tier_id: string | null;
   has_access: boolean;
-  role: 'user' | 'admin';
+  role: 'user' | 'reviewer' | 'admin';
   created_at: string;
 }
 
@@ -49,6 +49,18 @@ export interface CourseModule {
   bunny_video_id: string | null;
   video_duration_seconds: number | null;
   order_index: number;
+}
+
+
+export interface LessonProgress {
+  user_id: string;
+  module_id: string;
+  is_completed: boolean;
+  watch_seconds: number;
+  started_at: string;
+  last_watched_at: string;
+  completed_at: string | null;
+  updated_at: string;
 }
 
 export interface CaseFileSubmission {

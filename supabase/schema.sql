@@ -140,6 +140,21 @@ create table if not exists site_settings (
   landing_image_url text
 );
 
+-- ---------- 11. STUDENT LESSON PROGRESS ----------
+create table if not exists lesson_progress (
+  user_id uuid references profiles(id) on delete cascade not null,
+  module_id uuid references course_modules(id) on delete cascade not null,
+  is_completed boolean not null default false,
+  watch_seconds integer not null default 0 check (watch_seconds >= 0),
+  started_at timestamptz not null default now(),
+  last_watched_at timestamptz not null default now(),
+  completed_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, module_id)
+);
+create index if not exists lesson_progress_user_recent_idx
+  on lesson_progress (user_id, last_watched_at desc);
+
 -- =============================================================
 -- HELPERS
 -- =============================================================
@@ -165,6 +180,58 @@ as $$
     (select t.order_index from profiles p join tiers t on t.id = p.tier_id
       where p.id = auth.uid() and p.has_access = true), 0);
 $$;
+
+-- Atomic progress helpers used by the student course page.
+create or replace function public.record_lesson_watch(p_module_id uuid, p_seconds integer default 0)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  safe_seconds integer := greatest(0, least(coalesce(p_seconds, 0), 120));
+begin
+  if auth.uid() is null then raise exception 'not authenticated'; end if;
+  if not exists (select 1 from profiles p where p.id = auth.uid()
+                 and (coalesce(p.has_access, false) or p.role in ('admin','reviewer'))) then
+    raise exception 'course access required';
+  end if;
+  insert into lesson_progress (user_id, module_id, watch_seconds, started_at, last_watched_at, updated_at)
+  values (auth.uid(), p_module_id, safe_seconds, now(), now(), now())
+  on conflict (user_id, module_id) do update
+    set watch_seconds = lesson_progress.watch_seconds + safe_seconds,
+        last_watched_at = now(), updated_at = now();
+end;
+$$;
+
+create or replace function public.set_lesson_complete(p_module_id uuid, p_completed boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then raise exception 'not authenticated'; end if;
+  if not exists (select 1 from profiles p where p.id = auth.uid()
+                 and (coalesce(p.has_access, false) or p.role in ('admin','reviewer'))) then
+    raise exception 'course access required';
+  end if;
+  insert into lesson_progress (user_id, module_id, is_completed, completed_at, started_at, last_watched_at, updated_at)
+  values (auth.uid(), p_module_id, coalesce(p_completed, false),
+          case when coalesce(p_completed, false) then now() else null end, now(), now(), now())
+  on conflict (user_id, module_id) do update
+    set is_completed = excluded.is_completed,
+        completed_at = case when excluded.is_completed then coalesce(lesson_progress.completed_at, now()) else null end,
+        last_watched_at = now(), updated_at = now();
+end;
+$$;
+
+revoke all on function public.record_lesson_watch(uuid, integer) from public;
+revoke execute on function public.record_lesson_watch(uuid, integer) from anon;
+grant execute on function public.record_lesson_watch(uuid, integer) to authenticated;
+revoke all on function public.set_lesson_complete(uuid, boolean) from public;
+revoke execute on function public.set_lesson_complete(uuid, boolean) from anon;
+grant execute on function public.set_lesson_complete(uuid, boolean) to authenticated;
 
 -- Create a profile row automatically for every new auth user.
 create or replace function public.handle_new_user()
@@ -205,6 +272,7 @@ alter table live_sessions               enable row level security;
 alter table community_settings          enable row level security;
 alter table production_partner_requests enable row level security;
 alter table site_settings               enable row level security;
+alter table lesson_progress             enable row level security;
 
 -- tiers: public read, admin write
 create policy "tiers public read"  on tiers for select using (true);
@@ -250,6 +318,16 @@ create policy "ppr admin all"  on production_partner_requests for all using (is_
 -- site settings: public read, admin write
 create policy "settings public read" on site_settings for select using (true);
 create policy "settings admin write" on site_settings for all using (is_admin()) with check (is_admin());
+
+-- student progress: learners can read their own rows; writes go through RPCs
+create policy "lesson progress own read" on lesson_progress
+  for select using (user_id = auth.uid() or is_admin());
+create policy "lesson progress own insert" on lesson_progress
+  for insert with check (user_id = auth.uid());
+create policy "lesson progress own update" on lesson_progress
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+revoke insert, update on lesson_progress from authenticated;
+grant select on lesson_progress to authenticated;
 
 -- =============================================================
 -- STORAGE BUCKETS

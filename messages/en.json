@@ -147,7 +147,8 @@
     "noSubmissions": "You haven't uploaded a file yet.",
     "empty": "Modules are being prepared.",
     "markDone": "Mark complete",
-    "markedDone": "Completed"
+    "markedDone": "Completed",
+    "learningArea": "Learning area"
   },
   "community": {
     "title": "Community",

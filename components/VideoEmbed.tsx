@@ -1,51 +1,96 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Play } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 /**
  * Click-to-play video facade.
  *
- * A page with ten modules used to mount ten iframes at once — ten connections
- * to Google Drive or Bunny before the student had watched anything. Each one
- * pulls its own player JavaScript, and the browser serialises them. That is
- * seconds of load time for videos nobody asked for yet.
- *
- * Now the page renders a lightweight poster. The real player is only created
- * when the student actually clicks, and `loading="lazy"` still applies to any
- * that end up below the fold.
- *
- * The signed URL is generated on the server and passed in — this component
- * never sees a secret, and never decides who is allowed to watch.
+ * Paid course lessons may pass a moduleId. In that case we record the amount
+ * of time the lesson player stays active while the tab is visible. The player
+ * itself lives in a cross-origin Drive/Bunny iframe, so the browser cannot
+ * safely inspect its internal playhead; this is intentionally "active viewing
+ * time", not a fabricated exact video position.
  */
 export default function VideoEmbed({
   src,
   title,
-  poster
+  poster,
+  moduleId
 }: {
   src: string | null;
   title: string;
   poster?: string | null;
+  moduleId?: string;
 }) {
   const [playing, setPlaying] = useState(false);
+  const supabase = useMemo(() => (moduleId ? createClient() : null), [moduleId]);
+  const pendingSeconds = useRef(0);
+  const lastTick = useRef<number | null>(null);
+  const flushing = useRef(false);
 
-  /*
-   * Google Drive's /preview player draws a "pop out" button in its top-right
-   * corner that opens the file on drive.google.com. It lives inside a
-   * cross-origin iframe, so its markup cannot be reached or restyled from
-   * here — no CSS, no JS, no iframe parameter removes it.
-   *
-   * The only thing that works is covering it. The patch below sits over that
-   * corner and swallows the click, so the button can neither be seen nor
-   * pressed.
-   *
-   * Be clear about what this is: it hides the exit, it does not lock the door.
-   * The iframe's src is still visible in devtools. Bunny Stream — already
-   * wired up in this project — is the answer when the video genuinely must be
-   * protected. For a free lead-magnet lesson, hiding the pop-out is the right
-   * amount of effort.
-   */
+  const flush = useCallback(async () => {
+    if (!moduleId || !supabase || flushing.current) return;
+    const seconds = Math.floor(pendingSeconds.current);
+    if (seconds <= 0) return;
+
+    pendingSeconds.current -= seconds;
+    flushing.current = true;
+    const { error } = await supabase.rpc('record_lesson_watch', {
+      p_module_id: moduleId,
+      p_seconds: seconds
+    });
+    flushing.current = false;
+
+    // Put the unsent seconds back so a transient network error does not erase
+    // them from this viewing session.
+    if (error) {
+      pendingSeconds.current += seconds;
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[progress] watch sync failed:', error.message);
+      }
+    }
+  }, [moduleId, supabase]);
+
+  useEffect(() => {
+    if (!playing || !moduleId || !supabase) return;
+
+    // Create the progress row immediately, even if the student watches for
+    // less than the periodic flush interval.
+    supabase.rpc('record_lesson_watch', { p_module_id: moduleId, p_seconds: 0 });
+    lastTick.current = Date.now();
+
+    const tick = () => {
+      const now = Date.now();
+      if (lastTick.current !== null && document.visibilityState === 'visible') {
+        pendingSeconds.current += Math.max(0, Math.min((now - lastTick.current) / 1000, 35));
+      }
+      lastTick.current = now;
+    };
+
+    const interval = window.setInterval(() => {
+      tick();
+      if (pendingSeconds.current >= 30) void flush();
+    }, 15000);
+
+    const onVisibility = () => {
+      tick();
+      if (document.visibilityState !== 'visible') void flush();
+    };
+
+    window.addEventListener('pagehide', onVisibility);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      window.clearInterval(interval);
+      tick();
+      void flush();
+      window.removeEventListener('pagehide', onVisibility);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [flush, moduleId, playing, supabase]);
+
   const isDrive = !!src && src.includes('drive.google.com');
-
   const frame =
     'relative aspect-video w-full overflow-hidden rounded-2xl bg-ink ring-1 ring-ink/10 shadow-[0_24px_60px_-24px_rgba(26,26,26,0.45)]';
 
@@ -66,19 +111,7 @@ export default function VideoEmbed({
         className={`${frame} group flex items-center justify-center`}
       >
         {poster && (
-          // Plain img on purpose: these are third-party poster URLs of unknown
-          // dimensions, and they are already behind a click.
           // eslint-disable-next-line @next/next/no-img-element
-          /*
-            object-CONTAIN, not cover.
-            
-            `cover` crops the poster to fill the frame, but the Drive player
-            letterboxes instead — so the still and the video showed different
-            framings, and pressing play made the picture visibly jump and
-            shrink. `contain` letterboxes the poster the same way the player
-            does, so the still is an exact preview of the first frame and
-            nothing moves on click.
-          */
           <img
             src={poster}
             alt=""
@@ -87,9 +120,6 @@ export default function VideoEmbed({
           />
         )}
 
-        {/* Keeps the play button readable over a bright or busy poster.
-            Radial so it darkens only behind the button, rather than dimming
-            the letterbox bars that `contain` now leaves. */}
         <span
           aria-hidden
           className="absolute inset-0"
@@ -122,23 +152,7 @@ export default function VideoEmbed({
       {isDrive && (
         <span
           aria-hidden
-          /*
-           * `right-0`, NOT `end-0`. The logical property flips to the left in
-           * Arabic, but the button being covered belongs to Drive's own LTR
-           * interface inside the iframe — it sits on the physical right in
-           * both languages.
-           *
-           * A GRADIENT, not a flat rectangle. The first version was a solid
-           * black block, which vanished against the player's chrome but read
-           * as a cut-out square the moment a bright frame was underneath it —
-           * exactly what it looked like over the crown on the poster. Fading
-           * to transparent reads as a corner vignette instead, so there is
-           * nothing to notice. It still swallows the click either way.
-           *
-           * Smaller on phones, where Drive draws a smaller button and a big
-           * patch would eat real picture.
-           */
-          onClick={(e) => e.preventDefault()}
+          onClick={(e: React.MouseEvent<HTMLSpanElement>) => e.preventDefault()}
           className="pointer-events-auto absolute right-0 top-0 h-12 w-14 cursor-default sm:h-14 sm:w-16"
           style={{
             background:

@@ -22,6 +22,10 @@ npm run dev
 | `migration-006-leads.sql` | جدول تسجيلات الدرس المجاني |
 | **`migration-007-column-security.sql`** | **ثغرتان أمنيتان — شغّله قبل استقبال أي دفع** |
 | `migration-008-sales-sheet-pricing.sql` | الأسعار من ورقة المبيعات |
+| **`migration-009-student-progress.sql`** | **تقدم الطالب، وقت المشاهدة، وإحصائيات Student Dashboard** |
+| **`migration-010-progress-hardening.sql`** | **يقفل التعديل المباشر على Progress ويجعل الكتابة عبر RPC فقط** |
+
+لو كنت شغّلت نسخة أقدم من `migration-009` بالفعل، لا تحتاج حذف أي بيانات: شغّل `migration-010-progress-hardening.sql` فقط لتطبيق الحماية الجديدة.
 
 رسالة `Success. No rows returned` صحيحة — هذه الملفات تُنشئ وتعدّل، ولا تُرجع صفوفاً.
 

@@ -147,7 +147,8 @@
     "noSubmissions": "لم ترفع أي ملف بعد.",
     "empty": "الوحدات قيد الإعداد.",
     "markDone": "وضع علامة مكتمل",
-    "markedDone": "مكتمل"
+    "markedDone": "مكتمل",
+    "learningArea": "منطقة التعلم"
   },
   "community": {
     "title": "المجتمع",
