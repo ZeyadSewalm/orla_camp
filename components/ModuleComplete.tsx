@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Check, Circle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
-let migrationRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+let migrationRefreshTimer: number | null = null;
 
 function scheduleMigrationRefresh(refresh: () => void) {
   if (migrationRefreshTimer) window.clearTimeout(migrationRefreshTimer);
