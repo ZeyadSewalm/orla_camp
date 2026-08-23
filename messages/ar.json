@@ -292,6 +292,7 @@
   "studentDashboardWelcome": {
     "welcomeBack": "مرحبًا بعودتك، {name} 👋",
     "readyToLearn": "جاهز تكمل رحلة التعلم؟",
-    "studentFallback": "طالب"
+    "studentFallback": "طالب",
+    "dashboardLabel": "لوحة الطالب"
   }
 }

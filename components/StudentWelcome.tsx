@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Sparkles } from 'lucide-react';
+import { Mail, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 function initials(name: string) {
@@ -80,31 +80,39 @@ export default function StudentWelcome({
   }, [fallbackStudent, initialAvatarUrl, initialEmail, initialName, supabase]);
 
   return (
-    <div className="relative overflow-hidden rounded-[2rem] border border-ink/10 bg-white p-5 soft-shadow sm:p-7 md:p-8">
-      <div aria-hidden className="absolute -end-12 -top-12 h-40 w-40 rounded-full bg-brass/10 blur-2xl" />
+    <div className="relative overflow-hidden rounded-[1.75rem] border border-ink/10 bg-gradient-to-br from-white via-white to-brass/5 px-5 py-5 soft-shadow sm:px-6 sm:py-6 md:px-7">
+      <div aria-hidden className="absolute -end-16 -top-20 h-48 w-48 rounded-full bg-brass/10 blur-3xl" />
+      <div aria-hidden className="absolute -bottom-20 start-1/3 h-32 w-32 rounded-full bg-brandSun/15 blur-3xl" />
+
       <div className="relative flex items-center gap-4 sm:gap-5">
-        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-brass/15 bg-brass/10 sm:h-16 sm:w-16">
+        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-2xl border border-brass/15 bg-brass/10 shadow-sm sm:h-14 sm:w-14">
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={avatarUrl} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
           ) : (
-            <span className="flex h-full w-full items-center justify-center font-display text-lg font-black text-brass">
+            <span className="flex h-full w-full items-center justify-center font-display text-base font-black text-brass sm:text-lg">
               {initials(name)}
             </span>
           )}
         </div>
 
-        <div className="min-w-0">
-          {email && (
-            <div className="mb-1 flex items-center gap-2 text-brass">
-              <Sparkles aria-hidden className="h-4 w-4" />
-              <span className="truncate text-xs font-semibold">{email}</span>
-            </div>
-          )}
-          <h1 id="student-dashboard-title" className="font-display text-xl font-black leading-tight text-ink sm:text-2xl">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1.5 flex items-center gap-2 text-brass">
+            <Sparkles aria-hidden className="h-3.5 w-3.5" />
+            <span className="text-xs font-semibold uppercase tracking-[0.08em]">{t('dashboardLabel')}</span>
+          </div>
+          <h1 id="student-dashboard-title" className="max-w-4xl font-display text-[clamp(1.45rem,2.5vw,2.15rem)] font-black leading-[1.2] tracking-[-0.025em] text-ink">
             {t('welcomeBack', { name })}
           </h1>
-          <p className="mt-2 text-sm text-steel sm:text-base">{t('readyToLearn')}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            <p className="text-xs text-steel sm:text-sm">{t('readyToLearn')}</p>
+            {email && (
+              <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-steel/75">
+                <Mail aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                <span dir="ltr" className="max-w-[18rem] truncate">{email}</span>
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

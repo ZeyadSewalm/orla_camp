@@ -7,6 +7,8 @@ import {
   FileCheck2,
   PlayCircle,
   RotateCcw,
+  Sparkles,
+  Target,
 } from 'lucide-react';
 import type { CourseModule, LessonProgress } from '@/lib/types';
 import StudentWelcome from '@/components/StudentWelcome';
@@ -87,36 +89,42 @@ export default function StudentDashboard({
 
   const labels = ar
     ? {
+        overview: 'نظرة سريعة على تعلمك',
         progress: 'تقدمك في الكورس',
         completed: 'مكتمل',
         lessonsCompleted: 'دروس مكتملة',
+        completedLesson: 'درس مكتمل',
         remaining: 'دروس متبقية',
         watch: 'وقت المشاهدة',
-        continue: percentage === 100 && total > 0 ? 'أكملت الكورس' : recent ? 'كمل من حيث توقفت' : 'ابدأ التعلم',
-        lastLesson: recent ? 'آخر درس وصلت إليه' : 'ابدأ بأول درس',
+        continue: percentage === 100 && total > 0 ? 'أكملت الكورس' : recent ? 'كمل من حيث توقفت' : 'خطوتك التالية',
+        nextLesson: recent ? 'آخر درس وصلت إليه' : 'ابدأ بأول درس',
         action: percentage === 100 && total > 0 ? 'مراجعة الدروس' : recent ? 'متابعة المشاهدة' : 'ابدأ الكورس',
+        activityKicker: 'نشاطك',
         recent: 'آخر النشاطات',
-        noActivity: 'أول ما تبدأ مشاهدة الدروس، نشاطك هيظهر هنا.',
+        noActivity: 'ابدأ أول درس، وهنا هتظهر مشاهداتك وإنجازاتك وآخر نشاطاتك.',
         noProgress: 'تعذر تحميل تقدمك حاليًا. ما زال بإمكانك مشاهدة الدروس وإكمالها بشكل طبيعي.',
         lessons: 'درس',
-        courseContent: 'محتوى الكورس',
-        noCourses: 'لا توجد دروس متاحة للتعلّم في الكورس حاليًا.'
+        noCourses: 'لا توجد دروس متاحة للتعلّم في الكورس حاليًا.',
+        ready: percentage === 100 ? 'تم الإنجاز' : percentage > 0 ? 'استمر بنفس القوة' : 'جاهز للبدء',
       }
     : {
+        overview: 'Your learning at a glance',
         progress: 'Course progress',
         completed: 'completed',
         lessonsCompleted: 'Completed lessons',
+        completedLesson: 'lesson completed',
         remaining: 'Remaining lessons',
         watch: 'Total watch time',
-        continue: percentage === 100 && total > 0 ? 'Course completed' : recent ? 'Continue learning' : 'Start learning',
-        lastLesson: recent ? 'Last lesson reached' : 'Start with the first lesson',
+        continue: percentage === 100 && total > 0 ? 'Course completed' : recent ? 'Continue learning' : 'Your next step',
+        nextLesson: recent ? 'Last lesson reached' : 'Start with the first lesson',
         action: percentage === 100 && total > 0 ? 'Review lessons' : recent ? 'Continue watching' : 'Start course',
+        activityKicker: 'Your activity',
         recent: 'Recent activity',
-        noActivity: 'Your learning activity will appear here once you start watching lessons.',
+        noActivity: 'Start your first lesson and your viewing history and achievements will appear here.',
         noProgress: 'Your progress could not be loaded right now. You can still watch and complete lessons normally.',
         lessons: 'lessons',
-        courseContent: 'Course content',
-        noCourses: 'There are no lessons available to learn yet.'
+        noCourses: 'There are no lessons available to learn yet.',
+        ready: percentage === 100 ? 'Completed' : percentage > 0 ? 'Keep going' : 'Ready to start',
       };
 
   const statCards = [
@@ -126,7 +134,7 @@ export default function StudentDashboard({
   ];
 
   return (
-    <section aria-labelledby="student-dashboard-title" className="space-y-6 md:space-y-8">
+    <section aria-labelledby="student-dashboard-title" className="space-y-5 md:space-y-6">
       <StudentWelcome
         initialName={name}
         initialEmail={email}
@@ -145,124 +153,167 @@ export default function StudentDashboard({
         </div>
       ) : (
         <>
-      <div className="grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">
-        <div className="surface-card p-5 soft-shadow sm:p-7">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="label">{labels.progress}</p>
-              <h2 className="font-display text-lg font-black sm:text-xl">{courseName}</h2>
-            </div>
-            <div className="text-end">
-              <p className="figure text-2xl font-medium text-brass">{percentage}%</p>
-              <p className="text-xs text-steel">{labels.completed}</p>
-            </div>
-          </div>
-
-          <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-ink/[0.08]" aria-label={`${percentage}%`}>
-            <div
-              className="h-full rounded-full bg-brass transition-[width] duration-700 ease-out"
-              style={{ width: `${percentage}%` }}
-            />
-          </div>
-          <div className="mt-4 flex flex-wrap justify-between gap-2 text-xs text-steel sm:text-sm">
-            <span><strong className="figure text-ink">{completed} / {total}</strong> {labels.lessonsCompleted}</span>
-            <span><strong className="figure text-ink">{remaining}</strong> {labels.remaining}</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 lg:grid-cols-1 lg:gap-3">
-          {statCards.map(({ label, value, icon: Icon }) => (
-            <div key={label} className="rounded-2xl border border-ink/10 bg-white p-3 sm:p-4">
-              <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-xl bg-brass/10 text-brass">
-                <Icon aria-hidden className="h-4 w-4" />
-              </div>
-              <p className="figure text-base font-medium text-ink sm:text-lg">{value}</p>
-              <p className="mt-1 text-[0.68rem] leading-snug text-steel sm:text-xs">{label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="surface-card overflow-hidden soft-shadow">
-          <div className="grid sm:grid-cols-[11rem_1fr]">
-            <div className="relative min-h-40 bg-ink sm:min-h-full">
-              {image ? (
-                // See avatar note above; these URLs are configured by admins.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" />
-              ) : (
-                <div className="absolute inset-0 brand-grid bg-brass/5" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-ink/55 via-transparent to-transparent" />
-              <PlayCircle aria-hidden className="absolute bottom-4 start-4 h-9 w-9 text-white" />
-            </div>
-            <div className="p-5 sm:p-6">
-              <p className="label">{labels.continue}</p>
-              <h2 className="font-display text-lg font-black">{courseName}</h2>
-              {continueModule && (
-                <p className="mt-2 line-clamp-2 text-sm text-steel">
-                  {labels.lastLesson}: <span className="text-ink">{ar ? continueModule.title_ar : continueModule.title_en}</span>
-                </p>
-              )}
-              <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-ink/[0.08]">
-                <div className="h-full rounded-full bg-brass" style={{ width: `${percentage}%` }} />
-              </div>
-              <div className="mt-2 flex justify-between text-xs text-steel">
-                <span>{percentage}%</span>
-                <span>{completed} / {total} {labels.lessons}</span>
-              </div>
-              {continueModule && (
-                <Link href={continueHref} className="btn-primary mt-5 w-full justify-center sm:w-auto">
-                  <PlayCircle aria-hidden className="h-4 w-4" />
-                  {labels.action}
-                  <ArrowRight aria-hidden className="h-4 w-4 rtl:rotate-180" />
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="surface-card p-5 soft-shadow sm:p-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="label">{labels.recent}</p>
-              <h2 className="font-display text-lg font-black">{labels.recent}</h2>
-            </div>
-            <RotateCcw aria-hidden className="h-5 w-5 text-brass" />
-          </div>
-
-          {activities.length === 0 ? (
-            <p className="mt-5 rounded-2xl bg-ink/[0.035] p-4 text-sm leading-relaxed text-steel">{labels.noActivity}</p>
-          ) : (
-            <ol className="mt-5 space-y-1">
-              {activities.slice(0, 6).map((activity, index) => {
-                const Icon = activity.type === 'completed'
-                  ? CheckCircle2
-                  : activity.type === 'reviewed'
-                    ? FileCheck2
-                    : activity.type === 'submitted'
-                      ? FileCheck2
-                      : PlayCircle;
-                return (
-                  <li key={activity.id} className="relative flex gap-3 pb-4 last:pb-0">
-                    {index < Math.min(activities.length, 6) - 1 && (
-                      <span aria-hidden className="absolute start-[15px] top-8 h-[calc(100%_-_1.4rem)] w-px bg-ink/10" />
-                    )}
-                    <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brass/10 text-brass">
-                      <Icon aria-hidden className="h-4 w-4" />
+          <div className="grid gap-4 lg:grid-cols-[1.45fr_0.55fr] lg:items-start">
+            <div className="surface-card self-start p-5 soft-shadow sm:p-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <p className="label !mb-0">{labels.progress}</p>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-brass/10 px-2.5 py-1 text-xs font-semibold text-brass">
+                      <Target aria-hidden className="h-3 w-3" />
+                      {labels.ready}
                     </span>
-                    <div className="min-w-0 pt-0.5">
-                      <p className="text-sm font-semibold leading-snug text-ink">{activity.title}</p>
-                      <p className="mt-1 text-xs text-steel">{activity.meta} · {relativeTime(activity.at, locale)}</p>
+                  </div>
+                  <h2 className="truncate font-display text-[clamp(1.35rem,2vw,1.9rem)] font-black leading-tight text-ink">{courseName}</h2>
+                  <p className="mt-1.5 text-xs text-steel sm:text-sm">{labels.overview}</p>
+                </div>
+
+                <div className="shrink-0 text-end">
+                  <div className="inline-flex items-baseline gap-1 rounded-2xl bg-brass/5 px-3 py-2">
+                    <span className="figure text-[clamp(1.8rem,3vw,2.6rem)] font-medium leading-none text-brass">{percentage}%</span>
+                  </div>
+                  <p className="mt-1 text-xs text-steel">{labels.completed}</p>
+                </div>
+              </div>
+
+              <div className="mt-5 h-2 overflow-hidden rounded-full bg-ink/[0.07]" aria-label={`${percentage}%`}>
+                <div
+                  className="h-full rounded-full bg-brass transition-[width] duration-700 ease-out"
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+
+              <div className="mt-4 grid gap-2 xs:grid-cols-2">
+                <div className="rounded-2xl bg-ink/[0.035] px-3.5 py-3">
+                  <p className="text-xs text-steel">{labels.lessonsCompleted}</p>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span dir="ltr" className="figure text-base font-medium text-ink">{completed} / {total}</span>
+                    <span className="text-xs text-steel">{labels.completedLesson}</span>
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-ink/[0.035] px-3.5 py-3">
+                  <p className="text-xs text-steel">{labels.remaining}</p>
+                  <p className="figure mt-1 text-base font-medium text-ink">{remaining}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 lg:grid-cols-1 lg:gap-2.5">
+              {statCards.map(({ label, value, icon: Icon }) => (
+                <div key={label} className="group rounded-2xl border border-ink/10 bg-white p-3.5 transition duration-200 hover:-translate-y-0.5 hover:border-brass/20 hover:shadow-sm sm:p-4">
+                  <div className="flex items-center justify-between gap-2 lg:items-start">
+                    <div className="min-w-0">
+                      <p className="figure text-base font-medium text-ink sm:text-lg">{value}</p>
+                      <p className="mt-1 text-xs leading-snug text-steel">{label}</p>
                     </div>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-        </div>
-      </div>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brass/10 text-brass transition group-hover:bg-brass group-hover:text-white">
+                      <Icon aria-hidden className="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
+            <div className="surface-card overflow-hidden soft-shadow">
+              <div className="grid sm:grid-cols-[9.5rem_1fr]">
+                <div className="relative min-h-36 overflow-hidden bg-ink sm:min-h-full">
+                  {image ? (
+                    // These URLs are controlled by admins and may live outside Next Image domains.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-85 transition duration-500 hover:scale-[1.03]" />
+                  ) : (
+                    <div className="absolute inset-0 brand-grid bg-brass/5" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-ink/65 via-ink/10 to-transparent" />
+                  <span className="absolute bottom-4 start-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-brass shadow-lg">
+                    <PlayCircle aria-hidden className="h-5 w-5" />
+                  </span>
+                </div>
+
+                <div className="p-5 sm:p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="label !mb-0">{labels.continue}</p>
+                    <span className="figure rounded-full bg-brass/10 px-2.5 py-1 text-xs font-medium text-brass">{percentage}%</span>
+                  </div>
+                  <h2 className="mt-2 font-display text-lg font-black leading-tight">{courseName}</h2>
+                  {continueModule && (
+                    <div className="mt-3 rounded-2xl bg-ink/[0.035] p-3.5">
+                      <p className="text-xs font-semibold text-steel">{labels.nextLesson}</p>
+                      <p className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-ink">
+                        {ar ? continueModule.title_ar : continueModule.title_en}
+                      </p>
+                    </div>
+                  )}
+                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-ink/[0.08]">
+                    <div className="h-full rounded-full bg-brass transition-[width] duration-700" style={{ width: `${percentage}%` }} />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3 text-xs text-steel">
+                    <span>{percentage}%</span>
+                    <span className="flex items-center gap-1">
+                      <span dir="ltr" className="figure text-ink">{completed} / {total}</span>
+                      <span>{labels.lessons}</span>
+                    </span>
+                  </div>
+                  {continueModule && (
+                    <Link href={continueHref} className="btn-primary mt-4 w-full justify-center sm:w-auto">
+                      <PlayCircle aria-hidden className="h-4 w-4" />
+                      {labels.action}
+                      <ArrowRight aria-hidden className="h-4 w-4 rtl:rotate-180" />
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="surface-card p-5 soft-shadow sm:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="label !mb-1">{labels.activityKicker}</p>
+                  <h2 className="font-display text-lg font-black leading-tight">{labels.recent}</h2>
+                </div>
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brass/10 text-brass">
+                  <RotateCcw aria-hidden className="h-4 w-4" />
+                </span>
+              </div>
+
+              {activities.length === 0 ? (
+                <div className="mt-5 flex gap-3 rounded-2xl border border-dashed border-ink/10 bg-ink/[0.025] p-4">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brass/10 text-brass">
+                    <Sparkles aria-hidden className="h-4 w-4" />
+                  </span>
+                  <p className="text-xs leading-relaxed text-steel sm:text-sm">{labels.noActivity}</p>
+                </div>
+              ) : (
+                <ol className="mt-5 space-y-1">
+                  {activities.slice(0, 6).map((activity, index) => {
+                    const Icon = activity.type === 'completed'
+                      ? CheckCircle2
+                      : activity.type === 'reviewed'
+                        ? FileCheck2
+                        : activity.type === 'submitted'
+                          ? FileCheck2
+                          : PlayCircle;
+                    return (
+                      <li key={activity.id} className="relative flex gap-3 pb-4 last:pb-0">
+                        {index < Math.min(activities.length, 6) - 1 && (
+                          <span aria-hidden className="absolute start-[15px] top-8 h-[calc(100%_-_1.4rem)] w-px bg-ink/10" />
+                        )}
+                        <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brass/10 text-brass">
+                          <Icon aria-hidden className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0 pt-0.5">
+                          <p className="text-sm font-semibold leading-snug text-ink">{activity.title}</p>
+                          <p className="mt-1 text-xs text-steel">{activity.meta} · {relativeTime(activity.at, locale)}</p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </div>
+          </div>
         </>
       )}
     </section>

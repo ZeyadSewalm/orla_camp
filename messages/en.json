@@ -292,6 +292,7 @@
   "studentDashboardWelcome": {
     "welcomeBack": "Welcome back, {name} 👋",
     "readyToLearn": "Ready to keep learning?",
-    "studentFallback": "Student"
+    "studentFallback": "Student",
+    "dashboardLabel": "Student dashboard"
   }
 }
