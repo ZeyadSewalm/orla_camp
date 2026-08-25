@@ -6,7 +6,7 @@ import Reveal from '@/components/Reveal';
 import MagneticButton from '@/components/MagneticButton';
 import Curriculum from '@/components/Curriculum';
 import TierComparison from '@/components/TierComparison';
-import { getSiteSettings, getTiers } from '@/lib/data';
+import { getTiers } from '@/lib/data';
 import { lh } from '@/lib/href';
 import { seatsLeft } from '@/lib/pricing';
 
@@ -23,10 +23,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
   // `modules` used to be fetched here and never read. It is a whole extra
   // Supabase round trip on the site's busiest page, and since migration-007 it
   // is a service-role read of the paid video columns for no reason at all.
-  const [settings, tiers] = await Promise.all([
-    getSiteSettings(),
-    getTiers()
-  ]);
+  const tiers = await getTiers();
 
   const ar = locale === 'ar';
   const partner = tiers.find((x) => x.slug === 'production_partner');
@@ -76,12 +73,10 @@ export default async function Home({ params: { locale } }: { params: { locale: s
             {/* Full-width stacked on a phone, side by side from 400px up —
                 two half-width buttons on a 360px screen wrap their labels. */}
             <div className="mt-9 flex flex-col gap-3 xs:flex-row xs:flex-wrap xs:items-center md:mt-10">
-              {/* The button says "free Single Crown lesson" — so it now goes to the
-                  free lesson, not to a signup form. Promising something free
-                  and delivering a signup wall is the fastest way to lose
-                  someone at the very first click. */}
-              <MagneticButton href={lh(locale, '/free-lesson')} className="btn-brass w-full justify-center xs:w-auto">{t('ctaPrimary')}</MagneticButton>
-              <a href="#curriculum" className="btn-quiet w-full justify-center xs:w-auto">{t('ctaSecondary')}</a>
+              <MagneticButton href={lh(locale, '/pricing#plans')} className="btn-brass w-full justify-center xs:w-auto">{p('subscribe')}</MagneticButton>
+              {/* Keep the free lesson available, but make subscription the primary commercial CTA. */}
+              <Link href={lh(locale, '/free-lesson')} className="btn-quiet w-full justify-center xs:w-auto">{t('ctaPrimary')}</Link>
+              <a href="#curriculum" className="btn-outline w-full justify-center xs:w-auto">{t('ctaSecondary')}</a>
             </div>
 
             {left !== null && left > 0 && (
@@ -124,6 +119,11 @@ export default async function Home({ params: { locale } }: { params: { locale: s
           <p className="leading-relaxed text-ink/70">{t('problem3')}</p>
         </div>
           <p className="mt-12 border-s-2 border-brass ps-5 font-display text-lg font-black md:ps-7">{t('problemClose')}</p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link href={lh(locale, '/pricing#plans')} className="btn-primary w-full justify-center xs:w-auto">
+              {p('subscribe')}
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -144,6 +144,11 @@ export default async function Home({ params: { locale } }: { params: { locale: s
                 <p>{t('instructor2')}</p>
                 <p className="text-white">{t('instructor3')}</p>
               </div>
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <Link href={lh(locale, '/pricing#plans')} className="btn-on-dark w-full justify-center xs:w-auto">
+                  {p('subscribe')}
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -156,6 +161,11 @@ export default async function Home({ params: { locale } }: { params: { locale: s
           <p className="mt-4 max-w-2xl italic text-steel">{t('curriculumNote')}</p>
           <Curriculum locale={locale} labels={{ available: t('statusAvailable'), coming: t('statusComing') }} />
           <p className="mt-12 max-w-3xl border-s-4 border-brass ps-6 italic text-steel">{t('curriculumFooter')}</p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link href={lh(locale, '/pricing#plans')} className="btn-primary w-full justify-center xs:w-auto">
+              {p('subscribe')}
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -184,7 +194,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
           {t('partnerNote')}
         </p>
         <div className="mt-8 flex flex-col gap-3 xs:flex-row xs:flex-wrap">
-          <Link href={lh(locale, '/pricing')} className="btn-primary w-full justify-center xs:w-auto">{p('subscribe')}</Link>
+          <Link href={lh(locale, '/pricing#plans')} className="btn-primary w-full justify-center xs:w-auto">{p('subscribe')}</Link>
           <Link href={lh(locale, '/apply-production-partner')} className="btn-outline w-full justify-center xs:w-auto">{p('requestCall')}</Link>
         </div>
       </section>
@@ -202,6 +212,11 @@ export default async function Home({ params: { locale } }: { params: { locale: s
               </li>
             ))}
           </ul>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link href={lh(locale, '/pricing#plans')} className="btn-primary w-full justify-center xs:w-auto">
+              {p('subscribe')}
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -211,7 +226,9 @@ export default async function Home({ params: { locale } }: { params: { locale: s
         <div className="mt-8 grid max-w-4xl gap-6">
           <p className="leading-relaxed text-steel">{t('pricing2')}</p>
         </div>
-        <MagneticButton href={lh(locale, '/pricing')} className="btn-brass mt-9">{p('subscribe')}</MagneticButton>
+        <div className="mt-9 flex flex-wrap items-center gap-3">
+          <MagneticButton href={lh(locale, '/pricing#plans')} className="btn-brass w-full justify-center xs:w-auto">{p('subscribe')}</MagneticButton>
+        </div>
       </section>
 
       {/* ── 8. FAQ ── */}
@@ -226,6 +243,11 @@ export default async function Home({ params: { locale } }: { params: { locale: s
               </div>
             ))}
           </dl>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link href={lh(locale, '/pricing#plans')} className="btn-primary w-full justify-center xs:w-auto">
+              {p('subscribe')}
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -236,7 +258,9 @@ export default async function Home({ params: { locale } }: { params: { locale: s
           <div className="relative">
             <Reveal as="h2" className="display h-final max-w-4xl">{t('finalTitle')}</Reveal>
             <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/85 md:text-lg">{t('finalBody')}</p>
-            <Link href={lh(locale, '/pricing')} className="btn-on-dark mt-9 w-full justify-center xs:w-auto">{t('finalCta')}</Link>
+            <div className="mt-9 flex flex-wrap items-center gap-3">
+              <Link href={lh(locale, '/pricing#plans')} className="btn-on-dark w-full justify-center xs:w-auto">{p('subscribe')}</Link>
+            </div>
           </div>
         </div>
       </section>

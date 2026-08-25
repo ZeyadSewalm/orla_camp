@@ -40,7 +40,9 @@ export default async function Pricing({ params: { locale } }: { params: { locale
         <p className="relative mt-4 max-w-xl text-white/75">{t('subtitle')}</p>
       </div>
 
-      <PricingClient tiers={tiers} locale={locale} initialRegion={region} />
+      <div id="plans" className="scroll-mt-28">
+        <PricingClient tiers={tiers} locale={locale} initialRegion={region} />
+      </div>
 
       <div className="surface-card mt-10 space-y-3 p-6 text-sm text-steel">
         <p className="border-s-2 border-brass ps-4">{t('ppNote')}</p>
