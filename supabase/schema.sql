@@ -388,3 +388,95 @@ on conflict (slug) do nothing;
 
 -- Make yourself an admin after signing up:
 -- update profiles set role = 'admin' where email = 'you@example.com';
+
+-- =============================================================
+-- 12. STL ASSIGNMENTS + GOOGLE DRIVE SUBMISSIONS
+-- The binary file lives in Google Drive. Supabase is authoritative for
+-- ownership, lesson linkage, status, grade and instructor feedback.
+-- =============================================================
+create or replace function public.is_reviewer()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('reviewer', 'admin')
+  );
+$$;
+
+create table if not exists public.assignments (
+  id uuid primary key default gen_random_uuid(),
+  lesson_id uuid references public.course_modules(id) on delete restrict not null,
+  title_ar text not null,
+  title_en text not null,
+  description_ar text,
+  description_en text,
+  max_score numeric(8,2) not null default 100 check (max_score > 0),
+  allowed_file_types text[] not null default array['.stl']::text[],
+  max_file_size_mb integer check (max_file_size_mb is null or max_file_size_mb > 0),
+  due_date timestamptz,
+  active boolean not null default true,
+  allow_resubmission boolean not null default true,
+  drive_folder_id text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.assignment_submissions (
+  id uuid primary key default gen_random_uuid(),
+  assignment_id uuid references public.assignments(id) on delete restrict not null,
+  user_id uuid references public.profiles(id) on delete restrict not null,
+  drive_file_id text unique,
+  drive_web_view_link text,
+  original_filename text not null,
+  stored_filename text not null,
+  file_size bigint not null check (file_size >= 0),
+  attempt_number integer not null default 1 check (attempt_number > 0),
+  status text not null default 'uploading'
+    check (status in ('uploading','submitted','under_review','graded','needs_revision','resubmitted','failed')),
+  grade numeric(8,2),
+  admin_feedback text,
+  submitted_at timestamptz,
+  upload_started_at timestamptz not null default now(),
+  graded_at timestamptz,
+  graded_by uuid references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists assignments_lesson_active_idx on public.assignments (lesson_id, active);
+create index if not exists assignment_submissions_user_recent_idx on public.assignment_submissions (user_id, updated_at desc);
+create index if not exists assignment_submissions_queue_idx on public.assignment_submissions (status, submitted_at desc);
+create index if not exists assignment_submissions_assignment_user_idx on public.assignment_submissions (assignment_id, user_id, attempt_number desc);
+create unique index if not exists assignment_submissions_attempt_unique_idx on public.assignment_submissions (assignment_id, user_id, attempt_number);
+
+alter table public.assignments enable row level security;
+alter table public.assignment_submissions enable row level security;
+
+drop policy if exists "assignments course read" on public.assignments;
+create policy "assignments course read" on public.assignments for select using (
+  public.is_reviewer()
+  or (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and coalesce(p.has_access, false) = true
+    )
+    and (
+      active = true
+      or exists (
+        select 1 from public.assignment_submissions s
+        where s.assignment_id = assignments.id and s.user_id = auth.uid()
+      )
+    )
+  )
+);
+
+drop policy if exists "assignment submissions own read" on public.assignment_submissions;
+create policy "assignment submissions own read" on public.assignment_submissions
+  for select using (user_id = auth.uid() or public.is_reviewer());
+
+revoke insert, update, delete on public.assignments from anon, authenticated;
+revoke insert, update, delete on public.assignment_submissions from anon, authenticated;
+grant select on public.assignments to authenticated;
+grant select on public.assignment_submissions to authenticated;

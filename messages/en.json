@@ -260,7 +260,8 @@
     "notFoundBody": "That student doesn't exist — they may have been deleted.",
     "emptyModules": "No modules yet",
     "emptyModulesBody": "Add your first one using the form above.",
-    "leads": "Leads"
+    "leads": "Leads",
+    "tasks": "Student tasks"
   },
   "common": {
     "loading": "One moment…",

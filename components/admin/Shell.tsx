@@ -1,17 +1,17 @@
 import Link from 'next/link';
 import {
   LayoutDashboard, Users, CreditCard, PlayCircle, ClipboardCheck, Layers,
-  PhoneCall, Radio, MessagesSquare, TicketPercent, FileText, Inbox
+  PhoneCall, Radio, MessagesSquare, TicketPercent, FileText, Inbox, ListChecks
 } from 'lucide-react';
 import { lh } from '@/lib/href';
 
 export const TABS = [
-  'dashboard', 'students', 'leads', 'payments', 'modules', 'qc', 'tiers',
+  'dashboard', 'students', 'leads', 'payments', 'modules', 'tasks', 'qc', 'tiers',
   'requests', 'sessions', 'community', 'promos', 'content'
 ] as const;
 export type Tab = (typeof TABS)[number];
 
-export const REVIEWER_TABS: Tab[] = ['qc'];
+export const REVIEWER_TABS: Tab[] = ['tasks', 'qc'];
 
 const ICONS: Record<Tab, typeof Users> = {
   dashboard: LayoutDashboard,
@@ -19,6 +19,7 @@ const ICONS: Record<Tab, typeof Users> = {
   leads: Inbox,
   payments: CreditCard,
   modules: PlayCircle,
+  tasks: ListChecks,
   qc: ClipboardCheck,
   tiers: Layers,
   requests: PhoneCall,
@@ -31,12 +32,12 @@ const ICONS: Record<Tab, typeof Users> = {
 const GROUPS: Array<{ heading: string; tabs: Tab[] }> = [
   { heading: 'overview', tabs: ['dashboard'] },
   { heading: 'people', tabs: ['students', 'leads', 'payments', 'requests'] },
-  { heading: 'course', tabs: ['modules', 'qc', 'sessions'] },
+  { heading: 'course', tabs: ['modules', 'tasks', 'qc', 'sessions'] },
   { heading: 'selling', tabs: ['tiers', 'promos', 'content', 'community'] }
 ];
 
 export function Sidebar({
-  locale, active, labels, groupLabels, allowed, pendingQC = 0
+  locale, active, labels, groupLabels, allowed, pendingQC = 0, pendingTasks = 0
 }: {
   locale: string;
   active: Tab;
@@ -44,6 +45,7 @@ export function Sidebar({
   groupLabels: Record<string, string>;
   allowed: readonly Tab[];
   pendingQC?: number;
+  pendingTasks?: number;
 }) {
   // Dark ground so the sidebar reads as a distinct surface, not page background.
   return (
@@ -78,6 +80,11 @@ export function Sidebar({
                       {tab === 'qc' && pendingQC > 0 && (
                         <span className="ms-auto figure bg-brass px-1.5 text-[0.68rem] text-ink">
                           {pendingQC}
+                        </span>
+                      )}
+                      {tab === 'tasks' && pendingTasks > 0 && (
+                        <span className="ms-auto figure bg-brass px-1.5 text-[0.68rem] text-ink">
+                          {pendingTasks}
                         </span>
                       )}
                     </Link>

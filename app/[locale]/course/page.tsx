@@ -8,9 +8,10 @@ import StudentDashboard from '@/components/StudentDashboard';
 import { driveEmbedUrl } from '@/lib/drive';
 import { bunnyThumbnail, signedEmbedUrl } from '@/lib/bunny';
 import UploadCaseFile from '@/components/UploadCaseFile';
+import AssignmentTask from '@/components/AssignmentTask';
 import { createClient, getSessionUser } from '@/lib/supabase/server';
 import { getCachedProfile, getModules, getSiteSettings } from '@/lib/data';
-import type { CourseModule, LessonProgress } from '@/lib/types';
+import type { Assignment, AssignmentSubmission, CourseModule, LessonProgress } from '@/lib/types';
 import { lh } from '@/lib/href';
 
 export const metadata: Metadata = { robots: { index: false } };
@@ -52,7 +53,12 @@ export default async function Course({ params: { locale } }: { params: { locale:
   }
 
   const supabase = createClient();
-  const [{ data: progressRows, error: progressError }, { data: submissions }] = await Promise.all([
+  const [
+    { data: progressRows, error: progressError },
+    { data: submissions },
+    { data: assignmentRows, error: assignmentsError },
+    { data: taskSubmissionRows, error: taskSubmissionsError }
+  ] = await Promise.all([
     supabase
       .from('lesson_progress')
       .select('user_id,module_id,is_completed,watch_seconds,started_at,last_watched_at,completed_at,updated_at')
@@ -63,16 +69,43 @@ export default async function Course({ params: { locale } }: { params: { locale:
       .select('id,module_id,status,submitted_at,reviewed_at')
       .eq('user_id', user.id)
       .order('submitted_at', { ascending: false })
-      .limit(6)
+      .limit(6),
+    supabase
+      .from('assignments')
+      .select('id,lesson_id,title_ar,title_en,description_ar,description_en,max_score,allowed_file_types,max_file_size_mb,due_date,active,allow_resubmission,drive_folder_id,created_at,updated_at')
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('assignment_submissions')
+      .select('id,assignment_id,user_id,drive_file_id,drive_web_view_link,original_filename,stored_filename,file_size,attempt_number,status,grade,admin_feedback,submitted_at,upload_started_at,graded_at,graded_by,updated_at')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
   ]);
 
   if (progressError && process.env.NODE_ENV === 'development') {
     console.warn('[course] lesson_progress unavailable:', progressError.message);
   }
+  if ((assignmentsError || taskSubmissionsError) && process.env.NODE_ENV === 'development') {
+    console.warn('[course] STL tasks unavailable:', assignmentsError?.message || taskSubmissionsError?.message);
+  }
 
   const progress = (progressRows ?? []) as LessonProgress[];
+  const assignments = (assignmentRows ?? []) as Assignment[];
+  const taskSubmissions = (taskSubmissionRows ?? []) as AssignmentSubmission[];
   const progressByModule = new Map(progress.map((row) => [row.module_id, row]));
   const modulesById = new Map(modules.map((m) => [m.id, m]));
+  const assignmentsByLesson = new Map<string, Assignment[]>();
+  for (const assignment of assignments) {
+    if (!assignment.active) continue;
+    const list = assignmentsByLesson.get(assignment.lesson_id) ?? [];
+    list.push(assignment);
+    assignmentsByLesson.set(assignment.lesson_id, list);
+  }
+  const latestTaskSubmissionByAssignment = new Map<string, AssignmentSubmission>();
+  for (const submission of taskSubmissions) {
+    if (!latestTaskSubmissionByAssignment.has(submission.assignment_id)) {
+      latestTaskSubmissionByAssignment.set(submission.assignment_id, submission);
+    }
+  }
   const ar = locale === 'ar';
 
   const authName =
@@ -91,7 +124,7 @@ export default async function Course({ params: { locale } }: { params: { locale:
 
   const activities: Array<{
     id: string;
-    type: 'completed' | 'watched' | 'submitted' | 'reviewed';
+    type: 'completed' | 'watched' | 'submitted' | 'reviewed' | 'task_submitted' | 'task_graded' | 'task_revision';
     title: string;
     meta: string;
     at: string;
@@ -139,6 +172,40 @@ export default async function Course({ params: { locale } }: { params: { locale:
     });
   }
 
+
+  for (const submission of taskSubmissions) {
+    if (submission.status === 'uploading' || submission.status === 'failed') continue;
+    const assignment = assignments.find((item) => item.id === submission.assignment_id);
+    if (!assignment) continue;
+    const taskTitle = ar ? assignment.title_ar : assignment.title_en;
+    const activityAt = submission.graded_at || submission.submitted_at || submission.updated_at;
+    if (submission.status === 'graded') {
+      activities.push({
+        id: `task-graded-${submission.id}`,
+        type: 'task_graded',
+        title: ar ? `تم تقييم مهمة «${taskTitle}»` : `Task graded: “${taskTitle}”`,
+        meta: submission.grade !== null ? `${submission.grade} / ${assignment.max_score}` : courseName,
+        at: activityAt
+      });
+    } else if (submission.status === 'needs_revision') {
+      activities.push({
+        id: `task-revision-${submission.id}`,
+        type: 'task_revision',
+        title: ar ? `مهمة «${taskTitle}» تحتاج تعديل` : `Revision requested: “${taskTitle}”`,
+        meta: courseName,
+        at: activityAt
+      });
+    } else {
+      activities.push({
+        id: `task-submitted-${submission.id}`,
+        type: 'task_submitted',
+        title: ar ? `تم تسليم مهمة «${taskTitle}»` : `Submitted task: “${taskTitle}”`,
+        meta: courseName,
+        at: submission.submitted_at || submission.updated_at
+      });
+    }
+  }
+
   activities.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
   return (
@@ -154,6 +221,11 @@ export default async function Course({ params: { locale } }: { params: { locale:
         progress={progress}
         progressAvailable={!progressError}
         activities={activities}
+        taskSummaries={assignments.map((assignment) => ({
+          assignment,
+          submission: latestTaskSubmissionByAssignment.get(assignment.id) ?? null,
+          lesson: modulesById.get(assignment.lesson_id) ?? null
+        }))}
       />
 
       <section className="mt-14 border-t border-ink/10 pt-10 md:mt-20 md:pt-14" aria-labelledby="course-content-title">
@@ -210,6 +282,16 @@ export default async function Course({ params: { locale } }: { params: { locale:
                   labels={{ done: t('markedDone'), markDone: t('markDone') }}
                 />
               </div>
+
+
+              {(assignmentsByLesson.get(m.id) ?? []).map((assignment) => (
+                <AssignmentTask
+                  key={assignment.id}
+                  assignment={assignment}
+                  latestSubmission={latestTaskSubmissionByAssignment.get(assignment.id) ?? null}
+                  locale={locale}
+                />
+              ))}
             </article>
           ))}
         </div>

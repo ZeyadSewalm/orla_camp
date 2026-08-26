@@ -160,6 +160,109 @@ export async function deleteModule(formData: FormData) {
   done();
 }
 
+
+/* ---------------- STL assignments / Drive submissions ---------------- */
+export async function saveAssignment(formData: FormData) {
+  const { db } = await guard();
+  const id = str(formData.get('id'));
+  const rawTypes = String(formData.get('allowed_file_types') || '.stl')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+    .map((value) => value.startsWith('.') ? value : `.${value}`);
+  const allowed = Array.from(new Set(rawTypes.length ? rawTypes : ['.stl']));
+  const maxScore = num(formData.get('max_score')) ?? 100;
+  if (!Number.isFinite(maxScore) || maxScore <= 0) throw new Error('invalid max score');
+
+  const lessonId = String(formData.get('lesson_id'));
+  const payload = {
+    lesson_id: lessonId,
+    title_ar: String(formData.get('title_ar')).trim(),
+    title_en: String(formData.get('title_en')).trim(),
+    description_ar: str(formData.get('description_ar')),
+    description_en: str(formData.get('description_en')),
+    max_score: maxScore,
+    allowed_file_types: allowed,
+    max_file_size_mb: num(formData.get('max_file_size_mb')),
+    due_date: str(formData.get('due_date')),
+    active: formData.get('active') === 'on',
+    allow_resubmission: formData.get('allow_resubmission') === 'on',
+    updated_at: new Date().toISOString()
+  };
+
+  if (id) {
+    const { data: current } = await db.from('assignments').select('lesson_id').eq('id', id).maybeSingle();
+    // A cached Drive folder belongs to the old lesson. Clear it when an admin
+    // moves the task so the next upload resolves the correct Stage/Lesson path.
+    await db.from('assignments').update({
+      ...payload,
+      ...(current && current.lesson_id !== lessonId ? { drive_folder_id: null } : {})
+    }).eq('id', id);
+  } else {
+    await db.from('assignments').insert(payload);
+  }
+  done();
+}
+
+export async function deleteAssignment(formData: FormData) {
+  const { db } = await guard();
+  const id = String(formData.get('id'));
+  const { count } = await db
+    .from('assignment_submissions')
+    .select('*', { count: 'exact', head: true })
+    .eq('assignment_id', id);
+  // Never delete metadata that points at a real Drive file. Disable the task
+  // instead once students have submitted anything.
+  if ((count ?? 0) > 0) {
+    await db.from('assignments').update({ active: false, updated_at: new Date().toISOString() }).eq('id', id);
+  } else {
+    await db.from('assignments').delete().eq('id', id);
+  }
+  done();
+}
+
+export async function reviewAssignmentSubmission(formData: FormData) {
+  const { db, me } = await guardReviewer();
+  const id = String(formData.get('id'));
+  const requestedStatus = String(formData.get('status'));
+  const status = ['under_review', 'graded', 'needs_revision'].includes(requestedStatus)
+    ? requestedStatus
+    : 'under_review';
+
+  const { data: submission } = await db
+    .from('assignment_submissions')
+    .select('id,assignment_id')
+    .eq('id', id)
+    .maybeSingle();
+  if (!submission) throw new Error('submission not found');
+
+  const { data: assignment } = await db
+    .from('assignments')
+    .select('max_score')
+    .eq('id', submission.assignment_id)
+    .maybeSingle();
+  if (!assignment) throw new Error('assignment not found');
+
+  const rawGrade = num(formData.get('grade'));
+  const grade = rawGrade === null ? null : Number(rawGrade);
+  const maxScore = Number(assignment.max_score);
+  if (grade !== null && (!Number.isFinite(grade) || grade < 0 || grade > maxScore)) {
+    throw new Error('grade out of range');
+  }
+  if (status === 'graded' && grade === null) throw new Error('grade is required');
+
+  const now = new Date().toISOString();
+  await db.from('assignment_submissions').update({
+    status,
+    grade: status === 'graded' ? grade : null,
+    admin_feedback: str(formData.get('admin_feedback')),
+    graded_at: status === 'graded' ? now : null,
+    graded_by: me.id,
+    updated_at: now
+  }).eq('id', id);
+  done();
+}
+
 /* ---------------- case file QC ---------------- */
 export async function reviewCaseFile(formData: FormData) {
   const { db, me: admin } = await guardReviewer();

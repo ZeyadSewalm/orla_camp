@@ -11,10 +11,12 @@ import CaseFileLink from '@/components/admin/CaseFileLink';
 import { Users, Wallet, ClipboardCheck, Coins } from 'lucide-react';
 import BunnyUpload from '@/components/admin/BunnyUpload';
 import { isBunnyConfigured } from '@/lib/bunny';
+import { isGoogleDriveConfigured } from '@/lib/google-drive';
 import {
   updateTier, saveModule, deleteModule, reviewCaseFile, updateRequest,
   grantProductionPartner, saveSession, deleteSession, saveCommunity, savePromo,
-  deletePromo, saveSettings, updateStudent, recordManualPayment
+  deletePromo, saveSettings, updateStudent, recordManualPayment,
+  saveAssignment, deleteAssignment, reviewAssignmentSubmission
 } from './actions';
 
 export const metadata: Metadata = { robots: { index: false } };
@@ -25,7 +27,7 @@ export default async function Admin({
   searchParams
 }: {
   params: { locale: string };
-  searchParams: { tab?: string; student?: string; case?: string };
+  searchParams: { tab?: string; student?: string; case?: string; submission?: string };
 }) {
   unstable_setRequestLocale(locale);
 
@@ -51,6 +53,10 @@ export default async function Admin({
     .from('case_file_submissions')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'pending');
+  const { count: pendingTaskCount } = await db
+    .from('assignment_submissions')
+    .select('*', { count: 'exact', head: true })
+    .in('status', ['submitted', 'resubmitted', 'under_review']);
   const save = t('save');
   const crud = { save, add: t('add'), del: t('delete'), emptyModules: t('emptyModules'), emptyModulesBody: t('emptyModulesBody') };
 
@@ -64,7 +70,7 @@ export default async function Admin({
       </div>
 
       <div className="grid gap-10 lg:grid-cols-[13rem_1fr]">
-        <Sidebar locale={locale} active={tab} labels={labels} groupLabels={groupLabels} allowed={allowed} pendingQC={pendingQCCount ?? 0} />
+        <Sidebar locale={locale} active={tab} labels={labels} groupLabels={groupLabels} allowed={allowed} pendingQC={pendingQCCount ?? 0} pendingTasks={pendingTaskCount ?? 0} />
 
         <div className="min-w-0">
           {tab === 'dashboard' && <Dashboard db={db} locale={locale} t={t} />}
@@ -72,6 +78,7 @@ export default async function Admin({
           {tab === 'leads' && <Leads db={db} locale={locale} />}
           {tab === 'payments' && <Payments db={db} locale={locale} t={t} />}
           {tab === 'modules' && <Modules db={db} t={crud} />}
+          {tab === 'tasks' && <Tasks db={db} locale={locale} submissionId={searchParams.submission} isReviewer={isReviewer} />}
           {tab === 'qc' && <QC db={db} save={save} locale={locale} caseId={searchParams.case} t={t} />}
           {tab === 'tiers' && <Tiers db={db} save={save} />}
           {tab === 'requests' && <Requests db={db} save={save} />}
@@ -283,6 +290,240 @@ async function Modules({ db, t }: { db: DB; t: { save: string; add: string; del:
           </form>
         </Card>
       ))}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------- STL task review */
+async function Tasks({
+  db, locale, submissionId, isReviewer
+}: {
+  db: DB;
+  locale: string;
+  submissionId?: string;
+  isReviewer: boolean;
+}) {
+  const ar = locale === 'ar';
+  const labels = ar ? {
+    title: 'مهام الطلاب STL', setup: 'إعداد المهام', newTask: 'مهمة جديدة', lesson: 'الدرس',
+    titleAr: 'العنوان بالعربي', titleEn: 'العنوان بالإنجليزي', descAr: 'الوصف بالعربي', descEn: 'الوصف بالإنجليزي',
+    maxScore: 'الدرجة النهائية', types: 'أنواع الملفات', maxSize: 'أقصى حجم MB', due: 'الموعد النهائي',
+    active: 'مفعلة', resubmit: 'السماح بإعادة التسليم', save: 'حفظ المهمة', remove: 'حذف / تعطيل',
+    queue: 'طابور التسليمات', emptyQueue: 'لا توجد تسليمات STL بعد.', student: 'الطالب', stage: 'المرحلة',
+    submitted: 'تم التسليم', underReview: 'قيد المراجعة', graded: 'تم التقييم', revision: 'يحتاج تعديل',
+    file: 'الملف', openDrive: 'فتح / تنزيل STL', openHint: 'الملف خاص؛ افتحه بحساب Google الذي يملك/يشارك مجلد OrlaDent Camp.',
+    grade: 'الدرجة', feedback: 'ملاحظات المدرب', status: 'الحالة', saveEvaluation: 'حفظ التقييم', attempt: 'المحاولة',
+    driveOff: 'Google Drive غير مهيأ بعد. أضف رابط Apps Script والـ Secret في Vercel قبل استقبال ملفات حقيقية.',
+    noAssignments: 'لا توجد مهام. أنشئ أول مهمة واربطها بدرس معين.', size: 'الحجم', date: 'التاريخ'
+  } : {
+    title: 'Student STL Tasks', setup: 'Task setup', newTask: 'New task', lesson: 'Lesson',
+    titleAr: 'Arabic title', titleEn: 'English title', descAr: 'Arabic description', descEn: 'English description',
+    maxScore: 'Max score', types: 'File types', maxSize: 'Max size MB', due: 'Due date',
+    active: 'Active', resubmit: 'Allow resubmission', save: 'Save task', remove: 'Delete / disable',
+    queue: 'Submission queue', emptyQueue: 'No STL submissions yet.', student: 'Student', stage: 'Stage',
+    submitted: 'Submitted', underReview: 'Under review', graded: 'Graded', revision: 'Needs revision',
+    file: 'File', openDrive: 'Open / Download STL', openHint: 'The file is private; open it with a Google account that owns or can access the OrlaDent Camp folder.',
+    grade: 'Grade', feedback: 'Instructor feedback', status: 'Status', saveEvaluation: 'Save evaluation', attempt: 'Attempt',
+    driveOff: 'Google Drive is not configured yet. Add the Apps Script URL and secret in Vercel before accepting real files.',
+    noAssignments: 'No tasks yet. Create the first task and attach it to a lesson.', size: 'Size', date: 'Date'
+  };
+
+  const [{ data: modules }, { data: assignments }, { data: submissions }, { data: profiles }] = await Promise.all([
+    db.from('course_modules').select('id,title_ar,title_en,block,order_index').order('order_index'),
+    db.from('assignments').select('*').order('created_at', { ascending: true }),
+    db.from('assignment_submissions').select('*').not('status', 'in', '(uploading,failed)').order('updated_at', { ascending: false }).limit(500),
+    db.from('profiles').select('id,email,full_name')
+  ]);
+
+  const moduleById = new Map((modules ?? []).map((m: any) => [m.id, m]));
+  const assignmentById = new Map((assignments ?? []).map((a: any) => [a.id, a]));
+  const profileById = new Map((profiles ?? []).map((profile: any) => [profile.id, profile]));
+  const rows = submissions ?? [];
+  const pending = rows.filter((row: any) => ['submitted', 'resubmitted', 'under_review'].includes(row.status));
+  const selected = rows.find((row: any) => row.id === submissionId) ?? pending[pending.length - 1] ?? rows[0] ?? null;
+  const selectedAssignment = selected ? assignmentById.get(selected.assignment_id) : null;
+  const selectedModule = selectedAssignment ? moduleById.get(selectedAssignment.lesson_id) : null;
+  const selectedProfile = selected ? profileById.get(selected.user_id) : null;
+
+  const stageText = (block: string | null | undefined) => {
+    if (block === 'foundations') return ar ? 'المرحلة 1' : 'Stage 1';
+    if (block === 'restorative') return ar ? 'المرحلة 2' : 'Stage 2';
+    if (block === 'advanced') return ar ? 'المرحلة 3' : 'Stage 3';
+    return block || '—';
+  };
+  const statusText = (status: string) => status === 'graded'
+    ? labels.graded
+    : status === 'needs_revision'
+      ? labels.revision
+      : status === 'under_review'
+        ? labels.underReview
+        : labels.submitted;
+  const statusTone = (status: string): 'ok' | 'warn' | 'bad' | 'mute' => status === 'graded'
+    ? 'ok'
+    : status === 'needs_revision'
+      ? 'bad'
+      : status === 'under_review'
+        ? 'warn'
+        : 'mute';
+  const formatSize = (bytes: number) => `${Math.max(0, Number(bytes || 0) / 1024 / 1024).toFixed(Number(bytes || 0) < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+  const localDateTime = (value: string | null) => value
+    ? new Intl.DateTimeFormat(ar ? 'ar-EG-u-nu-latn' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Cairo' }).format(new Date(value))
+    : '—';
+  const inputDate = (value: string | null) => value ? new Date(value).toISOString().slice(0, 16) : '';
+
+  const assignmentForm = (assignment?: any) => (
+    <form action={saveAssignment} className="grid gap-3 sm:grid-cols-2">
+      {assignment && <input type="hidden" name="id" value={assignment.id} />}
+      <Field label={labels.lesson}>
+        <select name="lesson_id" defaultValue={assignment?.lesson_id ?? ''} className="field" required>
+          <option value="" disabled>—</option>
+          {(modules ?? []).map((module: any) => (
+            <option key={module.id} value={module.id}>
+              {String(module.order_index).padStart(2, '0')} — {ar ? module.title_ar : module.title_en}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label={labels.maxScore}><input name="max_score" type="number" min="1" step="0.5" defaultValue={assignment?.max_score ?? 100} className="field" required /></Field>
+      <Field label={labels.titleAr}><input name="title_ar" defaultValue={assignment?.title_ar ?? ''} className="field" required /></Field>
+      <Field label={labels.titleEn}><input name="title_en" defaultValue={assignment?.title_en ?? ''} className="field" required /></Field>
+      <Field label={labels.descAr}><textarea name="description_ar" rows={2} defaultValue={assignment?.description_ar ?? ''} className="field" /></Field>
+      <Field label={labels.descEn}><textarea name="description_en" rows={2} defaultValue={assignment?.description_en ?? ''} className="field" /></Field>
+      <Field label={labels.types} hint=".stl, .ply"><input name="allowed_file_types" defaultValue={(assignment?.allowed_file_types ?? ['.stl']).join(', ')} className="field" /></Field>
+      <Field label={labels.maxSize} hint={ar ? 'اتركه فارغًا لاستخدام حد النظام.' : 'Leave blank to use the system limit.'}><input name="max_file_size_mb" type="number" min="1" defaultValue={assignment?.max_file_size_mb ?? ''} className="field" /></Field>
+      <Field label={labels.due}><input name="due_date" type="datetime-local" defaultValue={inputDate(assignment?.due_date ?? null)} className="field" /></Field>
+      <div className="flex flex-wrap items-end gap-5 pb-2 text-sm">
+        <label className="flex items-center gap-2"><input type="checkbox" name="active" defaultChecked={assignment?.active ?? true} className="h-4 w-4" />{labels.active}</label>
+        <label className="flex items-center gap-2"><input type="checkbox" name="allow_resubmission" defaultChecked={assignment?.allow_resubmission ?? true} className="h-4 w-4" />{labels.resubmit}</label>
+      </div>
+      <button className="btn-primary sm:col-span-2">{labels.save}</button>
+    </form>
+  );
+
+  return (
+    <div className="space-y-6">
+      {!isGoogleDriveConfigured() && (
+        <div className="border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">{labels.driveOff}</div>
+      )}
+
+      {!isReviewer && (
+        <details className="border border-line bg-white" open={(assignments ?? []).length === 0}>
+          <summary className="cursor-pointer px-5 py-4 font-display text-base font-bold">{labels.setup}</summary>
+          <div className="border-t border-line p-5 sm:p-7">
+            <h2 className="mb-5 font-display text-lg font-bold">{labels.newTask}</h2>
+            {assignmentForm()}
+            {(assignments ?? []).length === 0 ? (
+              <p className="mt-5 text-sm text-steel">{labels.noAssignments}</p>
+            ) : (
+              <div className="mt-7 space-y-4 border-t border-line pt-7">
+                {(assignments ?? []).map((assignment: any) => {
+                  const module = moduleById.get(assignment.lesson_id);
+                  return (
+                    <details key={assignment.id} className="rounded-xl border border-ink/10 bg-paper/40">
+                      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">
+                        {assignment.active ? '● ' : '○ '}{ar ? assignment.title_ar : assignment.title_en}
+                        {module ? ` · ${ar ? module.title_ar : module.title_en}` : ''}
+                      </summary>
+                      <div className="border-t border-line bg-white p-4">
+                        {assignmentForm(assignment)}
+                        <form action={deleteAssignment} className="mt-3">
+                          <input type="hidden" name="id" value={assignment.id} />
+                          <button className="text-xs text-red-700 underline">{labels.remove}</button>
+                        </form>
+                      </div>
+                    </details>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
+      <div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="font-display text-lg font-black">{labels.queue}</h2>
+          <span className="figure text-sm text-brass">{pending.length}</span>
+        </div>
+        {rows.length === 0 ? (
+          <Empty title={labels.queue}>{labels.emptyQueue}</Empty>
+        ) : (
+          <div className="grid gap-px border border-line bg-line lg:grid-cols-[21rem_1fr]">
+            <div className="bg-white">
+              <ul className="max-h-[42rem] overflow-y-auto">
+                {rows.map((row: any) => {
+                  const profile = profileById.get(row.user_id);
+                  const assignment = assignmentById.get(row.assignment_id);
+                  const module = assignment ? moduleById.get(assignment.lesson_id) : null;
+                  const on = row.id === selected?.id;
+                  return (
+                    <li key={row.id}>
+                      <a href={`${lh(locale, '/admin')}?tab=tasks&submission=${row.id}`} className={`block border-b border-line px-5 py-4 transition ${on ? 'border-s-2 border-s-brass bg-paper' : 'hover:bg-paper'}`}>
+                        <p className="truncate text-sm font-semibold text-ink">{profile?.full_name || profile?.email || row.user_id}</p>
+                        <p className="mt-1 truncate text-xs text-steel">{assignment ? (ar ? assignment.title_ar : assignment.title_en) : 'Task'}{module ? ` · ${stageText(module.block)} · ${ar ? module.title_ar : module.title_en}` : ''}</p>
+                        <p className="mt-2.5 flex items-center justify-between gap-2"><Pill tone={statusTone(row.status)}>{statusText(row.status)}</Pill><span className="figure text-[0.68rem] text-steel">#{row.attempt_number}</span></p>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            <div className="bg-white p-5 sm:p-7">
+              {selected && selectedAssignment ? (
+                <>
+                  <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
+                    <div>
+                      <h3 className="font-display text-lg font-black">{selectedProfile?.full_name || selectedProfile?.email || selected.user_id}</h3>
+                      <p className="mt-1 text-sm text-steel">{selectedProfile?.email}</p>
+                      <p className="mt-3 text-sm font-semibold">{ar ? selectedAssignment.title_ar : selectedAssignment.title_en}</p>
+                      <p className="mt-1 text-xs text-steel">{selectedModule ? `${labels.stage}: ${stageText(selectedModule.block)} · ${labels.lesson}: ${ar ? selectedModule.title_ar : selectedModule.title_en}` : ''}</p>
+                    </div>
+                    <Pill tone={statusTone(selected.status)}>{statusText(selected.status)}</Pill>
+                  </div>
+
+                  <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl bg-paper p-3"><p className="label !mb-1">{labels.file}</p><p className="truncate text-sm font-semibold">{selected.original_filename}</p></div>
+                    <div className="rounded-xl bg-paper p-3"><p className="label !mb-1">{labels.size}</p><p className="figure text-sm">{formatSize(selected.file_size)}</p></div>
+                    <div className="rounded-xl bg-paper p-3"><p className="label !mb-1">{labels.attempt}</p><p className="figure text-sm">#{selected.attempt_number}</p></div>
+                  </div>
+                  <p className="mt-3 text-xs text-steel">{labels.date}: {localDateTime(selected.submitted_at || selected.updated_at)}</p>
+
+                  <div className="mt-5 rounded-xl border border-dashed border-line bg-paper px-5 py-6 text-center">
+                    {selected.drive_web_view_link ? (
+                      <a href={selected.drive_web_view_link} target="_blank" rel="noopener noreferrer" className="btn-brass">{labels.openDrive}</a>
+                    ) : (
+                      <p className="text-sm text-steel">Drive file link unavailable</p>
+                    )}
+                    <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-steel">{labels.openHint}</p>
+                    {selected.drive_file_id && <code className="mt-3 block break-all text-[0.65rem] text-steel">{selected.drive_file_id}</code>}
+                  </div>
+
+                  <form action={reviewAssignmentSubmission} className="mt-6 grid gap-4 sm:grid-cols-2">
+                    <input type="hidden" name="id" value={selected.id} />
+                    <Field label={labels.status}>
+                      <select name="status" defaultValue={selected.status === 'graded' || selected.status === 'needs_revision' || selected.status === 'under_review' ? selected.status : 'under_review'} className="field">
+                        <option value="under_review">{labels.underReview}</option>
+                        <option value="graded">{labels.graded}</option>
+                        <option value="needs_revision">{labels.revision}</option>
+                      </select>
+                    </Field>
+                    <Field label={`${labels.grade} / ${selectedAssignment.max_score}`}>
+                      <input name="grade" type="number" min="0" max={Number(selectedAssignment.max_score)} step="0.5" defaultValue={selected.grade ?? ''} className="field" />
+                    </Field>
+                    <div className="sm:col-span-2">
+                      <Field label={labels.feedback}><textarea name="admin_feedback" rows={7} defaultValue={selected.admin_feedback ?? ''} className="field" /></Field>
+                    </div>
+                    <button className="btn-primary sm:col-span-2">{labels.saveEvaluation}</button>
+                  </form>
+                </>
+              ) : (
+                <Empty title={labels.queue}>{labels.emptyQueue}</Empty>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -5,21 +5,29 @@ import {
   CheckCircle2,
   Clock3,
   FileCheck2,
+  FileUp,
+  Star,
   PlayCircle,
   RotateCcw,
   Sparkles,
   Target,
 } from 'lucide-react';
-import type { CourseModule, LessonProgress } from '@/lib/types';
+import type { Assignment, AssignmentSubmission, CourseModule, LessonProgress } from '@/lib/types';
 import StudentWelcome from '@/components/StudentWelcome';
 import { lh } from '@/lib/href';
 
 type Activity = {
   id: string;
-  type: 'completed' | 'watched' | 'submitted' | 'reviewed';
+  type: 'completed' | 'watched' | 'submitted' | 'reviewed' | 'task_submitted' | 'task_graded' | 'task_revision';
   title: string;
   meta: string;
   at: string;
+};
+
+type TaskSummary = {
+  assignment: Assignment;
+  submission: AssignmentSubmission | null;
+  lesson: CourseModule | null;
 };
 
 function formatWatchTime(seconds: number, locale: string) {
@@ -55,7 +63,8 @@ export default function StudentDashboard({
   modules,
   progress,
   progressAvailable,
-  activities
+  activities,
+  taskSummaries
 }: {
   locale: string;
   name: string;
@@ -67,6 +76,7 @@ export default function StudentDashboard({
   progress: LessonProgress[];
   progressAvailable: boolean;
   activities: Activity[];
+  taskSummaries: TaskSummary[];
 }) {
   const ar = locale === 'ar';
   // Upcoming lessons are visible in the curriculum but must not inflate the
@@ -105,6 +115,16 @@ export default function StudentDashboard({
         noProgress: 'تعذر تحميل تقدمك حاليًا. ما زال بإمكانك مشاهدة الدروس وإكمالها بشكل طبيعي.',
         lessons: 'درس',
         noCourses: 'لا توجد دروس متاحة للتعلّم في الكورس حاليًا.',
+        tasksKicker: 'مهامك العملية',
+        tasksTitle: 'STL Tasks',
+        noTasks: 'لا توجد مهام STL مطلوبة منك حاليًا.',
+        taskNotSubmitted: 'لم يتم التسليم بعد',
+        taskSubmitted: 'تم التسليم',
+        taskReview: 'قيد المراجعة',
+        taskGraded: 'تم التقييم',
+        taskRevision: 'يحتاج تعديل',
+        goToTask: 'اذهب للمهمة',
+        score: 'النتيجة',
         ready: percentage === 100 ? 'تم الإنجاز' : percentage > 0 ? 'استمر بنفس القوة' : 'جاهز للبدء',
       }
     : {
@@ -124,6 +144,16 @@ export default function StudentDashboard({
         noProgress: 'Your progress could not be loaded right now. You can still watch and complete lessons normally.',
         lessons: 'lessons',
         noCourses: 'There are no lessons available to learn yet.',
+        tasksKicker: 'Hands-on work',
+        tasksTitle: 'STL Tasks',
+        noTasks: 'You do not have any STL tasks right now.',
+        taskNotSubmitted: 'Not submitted yet',
+        taskSubmitted: 'Submitted',
+        taskReview: 'Under review',
+        taskGraded: 'Graded',
+        taskRevision: 'Needs revision',
+        goToTask: 'Go to task',
+        score: 'Score',
         ready: percentage === 100 ? 'Completed' : percentage > 0 ? 'Keep going' : 'Ready to start',
       };
 
@@ -290,11 +320,13 @@ export default function StudentDashboard({
                   {activities.slice(0, 6).map((activity, index) => {
                     const Icon = activity.type === 'completed'
                       ? CheckCircle2
-                      : activity.type === 'reviewed'
-                        ? FileCheck2
-                        : activity.type === 'submitted'
-                          ? FileCheck2
-                          : PlayCircle;
+                      : activity.type === 'task_graded'
+                        ? Star
+                        : activity.type === 'task_revision'
+                          ? RotateCcw
+                          : activity.type === 'reviewed' || activity.type === 'submitted' || activity.type === 'task_submitted'
+                            ? FileCheck2
+                            : PlayCircle;
                     return (
                       <li key={activity.id} className="relative flex gap-3 pb-4 last:pb-0">
                         {index < Math.min(activities.length, 6) - 1 && (
@@ -313,6 +345,73 @@ export default function StudentDashboard({
                 </ol>
               )}
             </div>
+          </div>
+
+          <div className="surface-card p-5 soft-shadow sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="label !mb-1">{labels.tasksKicker}</p>
+                <h2 className="font-display text-lg font-black leading-tight">{labels.tasksTitle}</h2>
+              </div>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brass/10 text-brass">
+                <FileUp aria-hidden className="h-4 w-4" />
+              </span>
+            </div>
+
+            {taskSummaries.length === 0 ? (
+              <div className="mt-5 rounded-2xl border border-dashed border-ink/10 bg-ink/[0.025] p-4 text-sm text-steel">
+                {labels.noTasks}
+              </div>
+            ) : (
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {taskSummaries.map(({ assignment, submission, lesson }) => {
+                  const taskTitle = ar ? assignment.title_ar : assignment.title_en;
+                  const lessonTitle = lesson ? (ar ? lesson.title_ar : lesson.title_en) : courseName;
+                  const status = !submission || submission.status === 'uploading' || submission.status === 'failed'
+                    ? labels.taskNotSubmitted
+                    : submission.status === 'graded'
+                      ? labels.taskGraded
+                      : submission.status === 'needs_revision'
+                        ? labels.taskRevision
+                        : submission.status === 'under_review'
+                          ? labels.taskReview
+                          : labels.taskSubmitted;
+                  return (
+                    <div key={assignment.id} className="rounded-2xl border border-ink/10 bg-white p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs text-steel">{lessonTitle}</p>
+                          <h3 className="mt-1 font-display text-sm font-black text-ink sm:text-base">{taskTitle}</h3>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[0.7rem] font-semibold ${
+                          submission?.status === 'graded'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : submission?.status === 'needs_revision'
+                              ? 'bg-amber-50 text-amber-700'
+                              : 'bg-brass/10 text-brass'
+                        }`}>
+                          {status}
+                        </span>
+                      </div>
+
+                      {submission?.status === 'graded' && submission.grade !== null && (
+                        <div className="mt-3 flex items-center justify-between rounded-xl bg-brass/5 px-3 py-2">
+                          <span className="text-xs text-steel">{labels.score}</span>
+                          <span dir="ltr" className="figure text-sm font-medium text-ink">{submission.grade} / {assignment.max_score}</span>
+                        </div>
+                      )}
+                      {submission?.admin_feedback && (
+                        <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-steel">{submission.admin_feedback}</p>
+                      )}
+                      <Link href={`${lh(locale, '/course')}#lesson-${assignment.lesson_id}`} className="btn-quiet mt-3 w-full justify-center py-2 text-xs sm:w-auto">
+                        {labels.goToTask}
+                        <ArrowRight aria-hidden className="h-3.5 w-3.5 rtl:rotate-180" />
+                      </Link>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>
       )}

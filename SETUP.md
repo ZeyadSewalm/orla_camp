@@ -24,8 +24,9 @@ npm run dev
 | `migration-008-sales-sheet-pricing.sql` | الأسعار من ورقة المبيعات |
 | **`migration-009-student-progress.sql`** | **تقدم الطالب، وقت المشاهدة، وإحصائيات Student Dashboard** |
 | **`migration-010-progress-hardening.sql`** | **يقفل التعديل المباشر على Progress ويجعل الكتابة عبر RPC فقط** |
+| **`migration-011-stl-tasks-drive.sql`** | **مهام STL + ربط الطالب/الدرس/الدرجة في Supabase مع تخزين الملف في Google Drive** |
 
-لو كنت شغّلت نسخة أقدم من `migration-009` بالفعل، لا تحتاج حذف أي بيانات: شغّل `migration-010-progress-hardening.sql` فقط لتطبيق الحماية الجديدة.
+لو كنت شغّلت `migration-009` و`migration-010` بالفعل، لا تعيدهم ولا تحذف أي بيانات؛ شغّل فقط `migration-011-stl-tasks-drive.sql` لإضافة نظام مهام STL.
 
 رسالة `Success. No rows returned` صحيحة — هذه الملفات تُنشئ وتعدّل، ولا تُرجع صفوفاً.
 
@@ -48,22 +49,49 @@ npm run create-admin -- admin@orladent.com 'كلمة-مرور-قوية'
 | `PAYMOB_*` | الدفع في مصر |
 | `TAP_SECRET_KEY` | الدفع في الخليج والدولي |
 | `BUNNY_*` | فيديو محمي (اختياري) |
+| `GOOGLE_APPS_SCRIPT_URL` · `GOOGLE_APPS_SCRIPT_SECRET` | رفع مهام STL إلى Google Drive عبر Apps Script بدون OAuth Client |
+| `TASK_UPLOAD_MAX_MB` | حد أمان أقصى لحجم ملفات المهام (الافتراضي 512 MB) |
 
-## 5. Supabase → Authentication
+
+## 5. Google Drive لمهام STL — Apps Script فقط
+
+الطالب لا يسجل دخول Google ولا يرسل `user_id`. الموقع يقرأ المستخدم من Supabase Session على السيرفر. Google Apps Script يعمل بحساب Drive المخصص للمنصة وينشئ resumable upload session؛ الملف نفسه يرفع من المتصفح مباشرة إلى Google Drive.
+
+1. افتح `script.google.com` → New project.
+2. انسخ `google-apps-script/Code.gs`.
+3. شغّل `setupOrlaDrive` مرة واحدة ووافق على صلاحية Drive.
+4. من Execution log انسخ `GOOGLE_APPS_SCRIPT_SECRET`.
+5. Deploy → New deployment → Web app → Execute as **Me** → **Anyone**.
+6. انسخ رابط `/exec`.
+7. أضف إلى Vercel:
+
+```env
+GOOGLE_APPS_SCRIPT_URL=https://script.google.com/macros/s/.../exec
+GOOGLE_APPS_SCRIPT_SECRET=...
+TASK_UPLOAD_MAX_MB=512
+```
+
+8. Redeploy.
+
+**لا تحتاج Google Cloud Console ولا Client ID ولا Client Secret ولا Refresh Token.**
+
+الشرح المصور/التفصيلي مكتوب في `GOOGLE-DRIVE-STL-SETUP.md`.
+
+## 6. Supabase → Authentication
 
 - **URL Configuration → Redirect URLs:** أضف `https://<نطاقك>/**`
   (النجمتان ضروريتان: رابط الاستعادة يحمل query string، والمطابقة تامة بدونهما)
 - **Emails → SMTP Settings:** فعّل مزوّداً خارجياً.
   الافتراضي محدود برسالتين في الساعة للمشروع كله — لا يكفي لتأكيد الحسابات ولا لاستعادة كلمات المرور.
 
-## 6. الدرس المجاني
+## 7. الدرس المجاني
 
 1. في Drive: شارك الملف كـ **Anyone with the link → Viewer**
 2. لوحة التحكم → الوحدات → الصق الرابط، واختر ✅ **Free preview**
 3. تظهر لوحة الحالة أعلى القائمة ما تقدّمه صفحة `/free-lesson` فعلياً
 4. التسجيلات تظهر في تبويب **الاهتمامات**
 
-## 7. بعد النشر
+## 8. بعد النشر
 
 - افتح المصدر وابحث عن `<meta name="x-build">` للتأكد من النسخة المنشورة
 - امسح كاش المعاينات من [Facebook Debugger](https://developers.facebook.com/tools/debug/) بضغط "Scrape Again"
