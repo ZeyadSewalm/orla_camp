@@ -16,12 +16,15 @@ export default function VideoEmbed({
   src,
   title,
   poster,
-  moduleId
+  moduleId,
+  durationMinutes
 }: {
   src: string | null;
   title: string;
   poster?: string | null;
   moduleId?: string;
+  /** Module length in minutes, used to cap runaway watch-time accrual. */
+  durationMinutes?: number | null;
 }) {
   const [playing, setPlaying] = useState(false);
   const supabase = useMemo(() => (moduleId ? createClient() : null), [moduleId]);
@@ -52,6 +55,24 @@ export default function VideoEmbed({
     }
   }, [moduleId, supabase]);
 
+  /*
+   * CAP ON HOW MUCH ONE SITTING CAN LOG.
+   *
+   * The player is a cross-origin iframe, so we cannot tell when the student
+   * pauses — `playing` only ever goes true. A lesson tab left open on a
+   * desktop kept accruing seconds all day: the `visibilityState` check stops
+   * a BACKGROUND tab, but not a foreground one nobody is watching. Overnight
+   * that turns "Total watch time" into a number the student knows is false,
+   * which is worse than not showing it.
+   *
+   * 2x the module's own length is generous for rewinding and re-watching, and
+   * still far below an abandoned tab. Where the length is unknown, 3 hours is
+   * the ceiling — longer than any lesson here, shorter than a working day.
+   */
+  const sessionCapSeconds =
+    durationMinutes && durationMinutes > 0 ? durationMinutes * 60 * 2 : 3 * 60 * 60;
+  const sessionSeconds = useRef(0);
+
   useEffect(() => {
     if (!playing || !moduleId || !supabase) return;
 
@@ -63,7 +84,12 @@ export default function VideoEmbed({
     const tick = () => {
       const now = Date.now();
       if (lastTick.current !== null && document.visibilityState === 'visible') {
-        pendingSeconds.current += Math.max(0, Math.min((now - lastTick.current) / 1000, 35));
+        const elapsed = Math.max(0, Math.min((now - lastTick.current) / 1000, 35));
+        // Never log past the cap for this sitting.
+        const room = Math.max(0, sessionCapSeconds - sessionSeconds.current);
+        const counted = Math.min(elapsed, room);
+        sessionSeconds.current += counted;
+        pendingSeconds.current += counted;
       }
       lastTick.current = now;
     };

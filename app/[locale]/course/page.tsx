@@ -267,6 +267,7 @@ export default async function Course({ params: { locale } }: { params: { locale:
                 poster={m.thumbnail_url ?? (m.video_source === 'bunny' && m.bunny_video_id ? bunnyThumbnail(m.bunny_video_id) : null)}
                 title={ar ? m.title_ar : m.title_en}
                 moduleId={m.id}
+                durationMinutes={m.duration_minutes}
               />
 
               <div className="mt-4 flex flex-wrap items-center gap-3">

@@ -26,13 +26,25 @@ function extensionOf(filename: string) {
 
 export async function POST(request: Request) {
   try {
-    if (!isGoogleDriveConfigured()) {
-      return NextResponse.json({ error: 'drive_not_configured' }, { status: 503 });
-    }
-
+    /*
+     * AUTHENTICATE FIRST, then check configuration.
+     *
+     * These two were the other way round, so an anonymous POST got back
+     * `drive_not_configured` with a 503 — telling anyone who asked whether the
+     * Drive bridge is wired up, and which endpoints exist, without ever
+     * proving who they were. Every other route in this codebase answers 401
+     * first; these two were the exception.
+     *
+     * Server configuration is not a public fact, and an unauthenticated caller
+     * has no business learning anything but "no".
+     */
     const supabase = createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+    if (!isGoogleDriveConfigured()) {
+      return NextResponse.json({ error: 'drive_not_configured' }, { status: 503 });
+    }
 
     const body = await request.json() as Payload;
     const assignmentId = String(body.assignmentId || '').trim();
