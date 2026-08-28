@@ -463,6 +463,19 @@ html[lang='ar'] .display {
   to   { transform: scaleX(0.95); }
 }
 
+/*
+ * A highlight travelling along the progress bar.
+ *
+ * The bar's own animation stalls at 95% while it waits for the server, which
+ * is correct — it must not claim to be finished. But a bar frozen at 95% looks
+ * identical to a bar that is stuck. This keeps something moving for as long as
+ * the wait lasts.
+ */
+@keyframes sheen {
+  from { transform: translateX(-120%); }
+  to   { transform: translateX(420%); }
+}
+
 /* One pulse of brass light when a module is completed. */
 @keyframes celebrate {
   0%   { box-shadow: 0 0 0 0 rgba(176, 141, 87, 0.55); }

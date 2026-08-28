@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Suspense } from 'react';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations, unstable_setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -121,7 +122,22 @@ export default async function LocaleLayout({
       </head>
       <body>
         <NextIntlClientProvider messages={messages}>
-          <RouteProgress />
+          {/*
+            Suspense is REQUIRED here, not decorative.
+
+            RouteProgress reads useSearchParams() so it can tell when an
+            admin-panel navigation has arrived — those change only the query
+            string, never the pathname. In the App Router, useSearchParams
+            without a Suspense boundary opts every statically-rendered page in
+            the tree into client-side rendering, and `next build` fails with
+            "useSearchParams() should be wrapped in a suspense boundary".
+
+            The fallback is null on purpose: the progress bar has nothing
+            meaningful to show before it hydrates.
+          */}
+          <Suspense fallback={null}>
+            <RouteProgress />
+          </Suspense>
           <div className="flex min-h-screen flex-col">
             <Header locale={locale} />
             <main className="flex-1">{children}</main>

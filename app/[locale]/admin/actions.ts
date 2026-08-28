@@ -207,17 +207,54 @@ export async function saveAssignment(formData: FormData) {
 export async function deleteAssignment(formData: FormData) {
   const { db } = await guard();
   const id = String(formData.get('id'));
+
+  /*
+   * COUNT ONLY REAL SUBMISSIONS.
+   *
+   * This used to count every row, including `uploading` and `failed`. But
+   * upload-session inserts the row BEFORE the file is uploaded, so a student
+   * who merely opened the picker and abandoned it — or whose upload never
+   * finalised — left a row behind forever. From that moment on the delete
+   * button silently became a disable button, and no admin could tell why:
+   * the submission queue filters those same two statuses out, so the task
+   * looked like it had zero submissions while this count said otherwise.
+   *
+   * A row in either state points at no verified Drive file. There is nothing
+   * to protect.
+   */
   const { count } = await db
     .from('assignment_submissions')
     .select('*', { count: 'exact', head: true })
-    .eq('assignment_id', id);
+    .eq('assignment_id', id)
+    .not('status', 'in', '(uploading,failed)');
+
   // Never delete metadata that points at a real Drive file. Disable the task
-  // instead once students have submitted anything.
+  // instead once students have actually submitted something.
   if ((count ?? 0) > 0) {
-    await db.from('assignments').update({ active: false, updated_at: new Date().toISOString() }).eq('id', id);
-  } else {
-    await db.from('assignments').delete().eq('id', id);
+    const { error } = await db
+      .from('assignments')
+      .update({ active: false, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw new Error(`disable failed: ${error.message}`);
+    done();
+    return;
   }
+
+  /*
+   * Clear the dead rows first. assignment_submissions.assignment_id is
+   * ON DELETE RESTRICT, so leaving even one `failed` row behind makes the
+   * delete below fail with a foreign-key violation — and that error was never
+   * read, so the button did nothing at all and said nothing about it.
+   */
+  await db
+    .from('assignment_submissions')
+    .delete()
+    .eq('assignment_id', id)
+    .in('status', ['uploading', 'failed']);
+
+  const { error } = await db.from('assignments').delete().eq('id', id);
+  if (error) throw new Error(`delete failed: ${error.message}`);
+
   done();
 }
 

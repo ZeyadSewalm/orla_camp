@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
 import { getProfile } from '@/lib/supabase/server';
@@ -8,6 +9,7 @@ import {
   Card, Field, Sidebar, Stat, Empty, Pill, TABS, REVIEWER_TABS, type Tab
 } from '@/components/admin/Shell';
 import CaseFileLink from '@/components/admin/CaseFileLink';
+import SubmitButton, { SubmitLink } from '@/components/SubmitButton';
 import { Users, Wallet, ClipboardCheck, Coins } from 'lucide-react';
 import BunnyUpload from '@/components/admin/BunnyUpload';
 import { isBunnyConfigured } from '@/lib/bunny';
@@ -121,7 +123,7 @@ async function Tiers({ db, save }: { db: DB; save: string }) {
               <input type="checkbox" name="installments_available" defaultChecked={tier.installments_available} className="h-4 w-4" />
               Instalments on
             </label>
-            <button className="btn-primary w-full">{save}</button>
+            <SubmitButton className="btn-primary w-full">{save}</SubmitButton>
           </form>
         </Card>
       ))}
@@ -197,7 +199,7 @@ async function Modules({ db, t }: { db: DB; t: { save: string; add: string; del:
         Free preview — viewable without a paid plan
       </label>
 
-      <button className="btn-primary">{m ? t.save : t.add}</button>
+      <SubmitButton>{m ? t.save : t.add}</SubmitButton>
     </form>
   );
 
@@ -286,7 +288,7 @@ async function Modules({ db, t }: { db: DB; t: { save: string; add: string; del:
 
           <form action={deleteModule} className="mt-4">
             <input type="hidden" name="id" value={m.id} />
-            <button className="text-xs text-red-700 underline">{t.del}</button>
+            <SubmitLink>{t.del}</SubmitLink>
           </form>
         </Card>
       ))}
@@ -314,7 +316,10 @@ async function Tasks({
     file: 'الملف', openDrive: 'فتح / تنزيل STL', openHint: 'الملف خاص؛ افتحه بحساب Google الذي يملك/يشارك مجلد OrlaDent Camp.',
     grade: 'الدرجة', feedback: 'ملاحظات المدرب', status: 'الحالة', saveEvaluation: 'حفظ التقييم', attempt: 'المحاولة',
     driveOff: 'Google Drive غير مهيأ بعد. أضف رابط Apps Script والـ Secret في Vercel قبل استقبال ملفات حقيقية.',
-    noAssignments: 'لا توجد مهام. أنشئ أول مهمة واربطها بدرس معين.', size: 'الحجم', date: 'التاريخ'
+    noAssignments: 'لا توجد مهام. أنشئ أول مهمة واربطها بدرس معين.', size: 'الحجم', date: 'التاريخ',
+    stuckTitle: 'رفع لم يكتمل',
+    stuckBody: 'الطالب بدأ الرفع ولم يصل الملف كاملاً إلى Drive. لا يمكن تقييم هذه المحاولات — اطلب من الطالب إعادة الرفع.',
+    stuckStatus: { uploading: 'جاري الرفع', failed: 'فشل الرفع' }
   } : {
     title: 'Student STL Tasks', setup: 'Task setup', newTask: 'New task', lesson: 'Lesson',
     titleAr: 'Arabic title', titleEn: 'English title', descAr: 'Arabic description', descEn: 'English description',
@@ -325,20 +330,38 @@ async function Tasks({
     file: 'File', openDrive: 'Open / Download STL', openHint: 'The file is private; open it with a Google account that owns or can access the OrlaDent Camp folder.',
     grade: 'Grade', feedback: 'Instructor feedback', status: 'Status', saveEvaluation: 'Save evaluation', attempt: 'Attempt',
     driveOff: 'Google Drive is not configured yet. Add the Apps Script URL and secret in Vercel before accepting real files.',
-    noAssignments: 'No tasks yet. Create the first task and attach it to a lesson.', size: 'Size', date: 'Date'
+    noAssignments: 'No tasks yet. Create the first task and attach it to a lesson.', size: 'Size', date: 'Date',
+    stuckTitle: 'Incomplete upload',
+    stuckBody: 'The student started an upload but the file never reached Drive in full. These attempts cannot be graded — ask the student to upload again.',
+    stuckStatus: { uploading: 'Uploading', failed: 'Upload failed' }
   };
 
   const [{ data: modules }, { data: assignments }, { data: submissions }, { data: profiles }] = await Promise.all([
     db.from('course_modules').select('id,title_ar,title_en,block,order_index').order('order_index'),
     db.from('assignments').select('*').order('created_at', { ascending: true }),
-    db.from('assignment_submissions').select('*').not('status', 'in', '(uploading,failed)').order('updated_at', { ascending: false }).limit(500),
+    /*
+     * Fetch EVERY status, including uploading/failed.
+     *
+     * These two were filtered out in the query, which meant a submission that
+     * never finalised was invisible here — the admin saw "No STL submissions
+     * yet" while the student was looking at their own upload and the row sat
+     * in the database. They are split out below into a warning strip instead
+     * of being hidden: a stuck upload is exactly the thing an instructor needs
+     * to know about, not the thing to conceal.
+     */
+    db.from('assignment_submissions').select('*').order('updated_at', { ascending: false }).limit(500),
     db.from('profiles').select('id,email,full_name')
   ]);
 
   const moduleById = new Map((modules ?? []).map((m: any) => [m.id, m]));
   const assignmentById = new Map((assignments ?? []).map((a: any) => [a.id, a]));
   const profileById = new Map((profiles ?? []).map((profile: any) => [profile.id, profile]));
-  const rows = submissions ?? [];
+  const allRows = submissions ?? [];
+  // Gradeable submissions vs uploads that never arrived. Both are real rows;
+  // only the first group can be reviewed, only the second explains a task that
+  // refuses to delete.
+  const rows = allRows.filter((row: any) => !['uploading', 'failed'].includes(row.status));
+  const stuck = allRows.filter((row: any) => ['uploading', 'failed'].includes(row.status));
   const pending = rows.filter((row: any) => ['submitted', 'resubmitted', 'under_review'].includes(row.status));
   const selected = rows.find((row: any) => row.id === submissionId) ?? pending[pending.length - 1] ?? rows[0] ?? null;
   const selectedAssignment = selected ? assignmentById.get(selected.assignment_id) : null;
@@ -396,7 +419,7 @@ async function Tasks({
         <label className="flex items-center gap-2"><input type="checkbox" name="active" defaultChecked={assignment?.active ?? true} className="h-4 w-4" />{labels.active}</label>
         <label className="flex items-center gap-2"><input type="checkbox" name="allow_resubmission" defaultChecked={assignment?.allow_resubmission ?? true} className="h-4 w-4" />{labels.resubmit}</label>
       </div>
-      <button className="btn-primary sm:col-span-2">{labels.save}</button>
+      <SubmitButton className="btn-primary sm:col-span-2" ar={ar}>{labels.save}</SubmitButton>
     </form>
   );
 
@@ -428,7 +451,7 @@ async function Tasks({
                         {assignmentForm(assignment)}
                         <form action={deleteAssignment} className="mt-3">
                           <input type="hidden" name="id" value={assignment.id} />
-                          <button className="text-xs text-red-700 underline">{labels.remove}</button>
+                          <SubmitLink ar={ar}>{labels.remove}</SubmitLink>
                         </form>
                       </div>
                     </details>
@@ -438,6 +461,38 @@ async function Tasks({
             )}
           </div>
         </details>
+      )}
+
+      {stuck.length > 0 && (
+        <div className="border border-amber-300 bg-amber-50 px-5 py-4">
+          <p className="font-display text-sm font-bold text-amber-900">
+            {labels.stuckTitle} <span className="figure">({stuck.length})</span>
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-900/80">{labels.stuckBody}</p>
+          <ul className="mt-3 space-y-1.5">
+            {stuck.map((row: any) => {
+              const profile = profileById.get(row.user_id);
+              const assignment = assignmentById.get(row.assignment_id);
+              return (
+                <li key={row.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-900">
+                  <span className="font-semibold">{profile?.full_name || profile?.email || row.user_id}</span>
+                  <span className="opacity-60">·</span>
+                  <span>{assignment ? (ar ? assignment.title_ar : assignment.title_en) : '—'}</span>
+                  <span className="opacity-60">·</span>
+                  <span className="truncate">{row.original_filename}</span>
+                  <span className="opacity-60">·</span>
+                  <span className="figure">{formatSize(row.file_size)}</span>
+                  <span className="opacity-60">·</span>
+                  <span className="font-semibold">
+                    {(labels.stuckStatus as Record<string, string>)[row.status] ?? row.status}
+                  </span>
+                  <span className="opacity-60">·</span>
+                  <span className="figure opacity-70">{localDateTime(row.updated_at)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
       <div>
@@ -458,11 +513,11 @@ async function Tasks({
                   const on = row.id === selected?.id;
                   return (
                     <li key={row.id}>
-                      <a href={`${lh(locale, '/admin')}?tab=tasks&submission=${row.id}`} className={`block border-b border-line px-5 py-4 transition ${on ? 'border-s-2 border-s-brass bg-paper' : 'hover:bg-paper'}`}>
+                      <Link href={`${lh(locale, '/admin')}?tab=tasks&submission=${row.id}`} className={`block border-b border-line px-5 py-4 transition ${on ? 'border-s-2 border-s-brass bg-paper' : 'hover:bg-paper'}`}>
                         <p className="truncate text-sm font-semibold text-ink">{profile?.full_name || profile?.email || row.user_id}</p>
                         <p className="mt-1 truncate text-xs text-steel">{assignment ? (ar ? assignment.title_ar : assignment.title_en) : 'Task'}{module ? ` · ${stageText(module.block)} · ${ar ? module.title_ar : module.title_en}` : ''}</p>
                         <p className="mt-2.5 flex items-center justify-between gap-2"><Pill tone={statusTone(row.status)}>{statusText(row.status)}</Pill><span className="figure text-[0.68rem] text-steel">#{row.attempt_number}</span></p>
-                      </a>
+                      </Link>
                     </li>
                   );
                 })}
@@ -514,7 +569,7 @@ async function Tasks({
                     <div className="sm:col-span-2">
                       <Field label={labels.feedback}><textarea name="admin_feedback" rows={7} defaultValue={selected.admin_feedback ?? ''} className="field" /></Field>
                     </div>
-                    <button className="btn-primary sm:col-span-2">{labels.saveEvaluation}</button>
+                    <SubmitButton className="btn-primary sm:col-span-2" ar={ar}>{labels.saveEvaluation}</SubmitButton>
                   </form>
                 </>
               ) : (
@@ -560,7 +615,7 @@ async function QC({ db, save, locale, caseId, t }: { db: DB; save: string; local
             const on = row.id === selected?.id;
             return (
               <li key={row.id}>
-                <a
+                <Link
                   href={`${lh(locale, '/admin')}?tab=qc&case=${row.id}`}
                   aria-current={on ? 'true' : undefined}
                   className={`block border-b border-line px-5 py-4 transition ${
@@ -577,7 +632,7 @@ async function QC({ db, save, locale, caseId, t }: { db: DB; save: string; local
                       {new Date(row.submitted_at).toLocaleDateString('en-GB')}
                     </span>
                   </p>
-                </a>
+                </Link>
               </li>
             );
           })}
@@ -621,7 +676,7 @@ async function QC({ db, save, locale, caseId, t }: { db: DB; save: string; local
                   placeholder={t('feedbackPlaceholder')}
                 />
               </Field>
-              <button className="btn-primary">{save}</button>
+              <SubmitButton>{save}</SubmitButton>
             </form>
 
             {selected.reviewed_by && (
@@ -666,7 +721,7 @@ async function Requests({ db, save }: { db: DB; save: string }) {
               </select>
             </Field>
             <Field label="Notes"><input name="admin_notes" defaultValue={r.admin_notes ?? ''} className="field" /></Field>
-            <button className="btn-quiet sm:col-span-4">{save}</button>
+            <SubmitButton className="btn-quiet sm:col-span-4">{save}</SubmitButton>
           </form>
 
           {r.status === 'approved' && r.user_id && (
@@ -675,7 +730,7 @@ async function Requests({ db, save }: { db: DB; save: string }) {
               <input type="hidden" name="user_id" value={r.user_id} />
               <input type="hidden" name="agreed_price" value={r.agreed_price ?? ''} />
               <input type="hidden" name="agreed_currency" value={r.agreed_currency ?? 'EGP'} />
-              <button className="btn-brass text-sm">Grant access manually</button>
+              <SubmitButton className="btn-brass text-sm" pendingLabel="Granting access…">Grant access manually</SubmitButton>
               <span className="text-xs text-steel">Takes one of the 3 seats.</span>
             </form>
           )}
@@ -701,7 +756,7 @@ async function Sessions({ db, t }: { db: DB; t: { save: string; add: string; del
       <Field label="Minimum plan order"><input name="min_tier_order" type="number" defaultValue={s?.min_tier_order ?? 2} className="field" /></Field>
       <Field label="Join link"><input name="join_link" defaultValue={s?.join_link ?? ''} className="field" /></Field>
       <Field label="Recording link"><input name="recording_link" defaultValue={s?.recording_link ?? ''} className="field" /></Field>
-      <button className="btn-primary sm:col-span-2">{s ? t.save : t.add}</button>
+      <SubmitButton className="btn-primary sm:col-span-2">{s ? t.save : t.add}</SubmitButton>
     </form>
   );
 
@@ -713,7 +768,7 @@ async function Sessions({ db, t }: { db: DB; t: { save: string; add: string; del
           {form(s)}
           <form action={deleteSession} className="mt-3">
             <input type="hidden" name="id" value={s.id} />
-            <button className="text-xs text-red-700 underline">{t.del}</button>
+            <SubmitLink>{t.del}</SubmitLink>
           </form>
         </Card>
       ))}
@@ -729,7 +784,7 @@ async function Community({ db, save }: { db: DB; save: string }) {
       <form action={saveCommunity} className="max-w-lg space-y-4">
         <Field label="WhatsApp group link"><input name="whatsapp_group_link" defaultValue={data?.whatsapp_group_link ?? ''} className="field" /></Field>
         <Field label="Minimum plan order"><input name="min_tier_order" type="number" defaultValue={data?.min_tier_order ?? 2} className="field" /></Field>
-        <button className="btn-primary">{save}</button>
+        <SubmitButton>{save}</SubmitButton>
       </form>
     </Card>
   );
@@ -772,7 +827,7 @@ async function Promos({ db, t }: { db: DB; t: { save: string; add: string; del: 
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="is_active" defaultChecked={p ? p.is_active : true} className="h-4 w-4" /> Active
       </label>
-      <button className="btn-primary sm:col-span-2">{p ? t.save : t.add}</button>
+      <SubmitButton className="btn-primary sm:col-span-2">{p ? t.save : t.add}</SubmitButton>
     </form>
   );
 
@@ -785,7 +840,7 @@ async function Promos({ db, t }: { db: DB; t: { save: string; add: string; del: 
           {form(p)}
           <form action={deletePromo} className="mt-3">
             <input type="hidden" name="id" value={p.id} />
-            <button className="text-xs text-red-700 underline">{t.del}</button>
+            <SubmitLink>{t.del}</SubmitLink>
           </form>
         </Card>
       ))}
@@ -841,7 +896,7 @@ async function Settings({ db, save }: { db: DB; save: string }) {
         </div>
       </Card>
 
-      <button className="btn-primary">{save}</button>
+      <SubmitButton>{save}</SubmitButton>
     </form>
   );
 }
@@ -937,7 +992,7 @@ async function Students({
 
     return (
       <div className="space-y-8">
-        <a href={`${lh(locale, '/admin')}?tab=students`} className="text-sm text-brass underline">← {t('backToList')}</a>
+        <Link href={`${lh(locale, '/admin')}?tab=students`} className="text-sm text-brass underline">← {t('backToList')}</Link>
 
         <Card>
           <h2 className="font-display text-xl font-black">{student.full_name || student.email}</h2>
@@ -980,7 +1035,7 @@ async function Students({
               {t('hasAccess')}
             </label>
             <Field label={t('notes')}><textarea name="admin_notes" rows={3} defaultValue={student.admin_notes ?? ''} className="field" /></Field>
-            <div className="flex items-end"><button className="btn-primary w-full">{save}</button></div>
+            <div className="flex items-end"><SubmitButton className="btn-primary w-full">{save}</SubmitButton></div>
           </form>
         </Card>
 
@@ -1004,7 +1059,7 @@ async function Students({
               <input type="checkbox" name="grant_access" defaultChecked className="h-4 w-4" />
               {t('grantOnRecord')}
             </label>
-            <div className="sm:col-span-2"><button className="btn-brass w-full">{t('add')}</button></div>
+            <div className="sm:col-span-2"><SubmitButton className="btn-brass w-full">{t('add')}</SubmitButton></div>
           </form>
         </Card>
 
@@ -1072,9 +1127,9 @@ async function Students({
           {(students ?? []).map((u) => (
             <tr key={u.id} className="border-b border-line last:border-0 hover:bg-paper">
               <td className="p-4">
-                <a href={`${lh(locale, '/admin')}?tab=students&student=${u.id}`} className="font-medium text-brass underline">
+                <Link href={`${lh(locale, '/admin')}?tab=students&student=${u.id}`} className="font-medium text-brass underline">
                   {u.full_name || u.email}
-                </a>
+                </Link>
                 <span className="block text-xs text-steel">{u.email}</span>
               </td>
               <td className="p-4">{(u.tiers as any)?.name_en ?? '—'}</td>
@@ -1116,9 +1171,9 @@ async function Payments({ db, locale, t }: { db: DB; locale: string; t: any }) {
           {(rows ?? []).map((x) => (
             <tr key={x.id} className="border-b border-line last:border-0 hover:bg-paper">
               <td className="p-4">
-                <a href={`${lh(locale, '/admin')}?tab=students&student=${x.user_id}`} className="text-brass underline">
+                <Link href={`${lh(locale, '/admin')}?tab=students&student=${x.user_id}`} className="text-brass underline">
                   {(x.profiles as any)?.full_name || (x.profiles as any)?.email || '—'}
-                </a>
+                </Link>
               </td>
               <td className="p-4">{(x.tiers as any)?.name_en ?? '—'}</td>
               <td className="figure p-4 text-ink">{Number(x.amount).toLocaleString('en-US')} {x.currency}</td>
