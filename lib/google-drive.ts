@@ -88,7 +88,14 @@ async function callDriveBridge<T extends BridgeBaseResponse>(payload: Record<str
   const url = required('GOOGLE_APPS_SCRIPT_URL');
   const secret = required('GOOGLE_APPS_SCRIPT_SECRET');
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20_000);
+  /*
+   * 45s, under the routes' maxDuration of 60. The old 20s was meaningless:
+   * the platform killed the function at 10s first, so this timer never got to
+   * fire and the caller got a dropped connection instead of an error it could
+   * report. Aborting before the function dies is what turns "Failed to fetch"
+   * into a message that says what actually went wrong.
+   */
+  const timer = setTimeout(() => controller.abort(), 45_000);
 
   try {
     const response = await fetch(url, {

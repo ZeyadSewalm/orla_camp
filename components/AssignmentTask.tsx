@@ -188,21 +188,46 @@ export default function AssignmentTask({
       setState('finalizing');
       let finalized = false;
       for (let attempt = 0; attempt < 3 && !finalized; attempt += 1) {
-        const finish = await fetch('/api/tasks/complete-upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ submissionId: beginData.submissionId, driveFileId })
-        });
+        /*
+         * The fetch itself is inside the try, not just its response.
+         *
+         * The retry loop only handled a bad STATUS. If `fetch` REJECTED — a
+         * dropped connection, a killed serverless function, a phone switching
+         * from wifi to 4G — the TypeError escaped the loop entirely and the
+         * whole upload was reported as failed after a single blip, even though
+         * the file was already in Drive and one more attempt would have
+         * finished the job. That is the worst possible moment to give up: the
+         * expensive part is done.
+         */
+        let finish: Response;
+        try {
+          finish = await fetch('/api/tasks/complete-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ submissionId: beginData.submissionId, driveFileId })
+          });
+        } catch {
+          if (attempt === 2) {
+            throw new Error(
+              ar
+                ? 'اكتمل رفع الملف إلى Drive، لكن انقطع الاتصال قبل تسجيل التسليم. اضغط رفع مرة أخرى — لن يُرفع الملف من جديد.'
+                : 'The file finished uploading to Drive, but the connection dropped before the submission was recorded. Press upload again — the file will not be re-uploaded.'
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+          continue;
+        }
+
         if (finish.ok) {
           finalized = true;
           break;
         }
         const detail = await finish.json().catch(() => null) as { error?: string } | null;
-        const retryable = finish.status >= 500 || detail?.error === 'drive_file_not_ready';
+        const retryable = finish.status >= 500 || finish.status === 504 || detail?.error === 'drive_file_not_ready';
         if (!retryable || attempt === 2) {
-          throw new Error(ar ? 'تم رفع الملف لكن تعذر تسجيل التسليم. أعد المحاولة.' : 'The file uploaded but the submission could not be finalized. Please retry.');
+          throw new Error(ar ? 'اكتمل رفع الملف لكن تعذر تسجيل التسليم. أعد المحاولة.' : 'The file uploaded but the submission could not be finalized. Please retry.');
         }
-        await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+        await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
       }
       if (!finalized) throw new Error(ar ? 'تعذر تسجيل التسليم.' : 'Could not finalize the submission.');
 
@@ -210,7 +235,17 @@ export default function AssignmentTask({
       router.refresh();
     } catch (err) {
       setState('error');
-      setError(err instanceof Error ? err.message : (ar ? 'حدث خطأ أثناء الرفع.' : 'Upload failed.'));
+      // "Failed to fetch" is the browser's own wording for a dropped
+      // connection. Shown raw it tells a dental student nothing at all.
+      const raw = err instanceof Error ? err.message : '';
+      const isNetwork = /failed to fetch|networkerror|load failed/i.test(raw);
+      setError(
+        isNetwork
+          ? (ar
+              ? 'انقطع الاتصال أثناء الرفع. تحقّق من الإنترنت واضغط رفع مرة أخرى.'
+              : 'The connection dropped during upload. Check your internet and press upload again.')
+          : raw || (ar ? 'حدث خطأ أثناء الرفع.' : 'Upload failed.')
+      );
     } finally {
       if (inputRef.current) inputRef.current.value = '';
     }

@@ -15,6 +15,25 @@ type Payload = { submissionId?: string; driveFileId?: string | null };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/*
+ * WHY THIS EXISTS — this is the "Failed to fetch" bug.
+ *
+ * A route with no maxDuration gets the platform default, which is 10 seconds.
+ * This route calls the Apps Script bridge, and Apps Script has a cold start,
+ * then talks to Drive, then retries findBySubmission up to three times with
+ * sleeps between them. That comfortably exceeds 10 seconds on a cold call.
+ *
+ * Vercel then kills the function mid-flight. The browser never receives a
+ * response at all — not a 500, nothing — so `fetch` rejects with the raw
+ * TypeError "Failed to fetch". Which is exactly what the student saw, while
+ * the file sat safely in Drive the whole time.
+ *
+ * Note the bridge's own timeout was 20s: it could never fire, because the
+ * platform killed the function at 10. It has been lowered to sit under this
+ * limit so a slow bridge returns a real JSON error instead of a dead socket.
+ */
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   try {
     /*
