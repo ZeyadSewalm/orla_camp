@@ -133,6 +133,7 @@ export async function createResumableUploadSession(args: {
   userId: string;
   stageName: string;
   lessonName: string;
+  studentFolderName: string;
 }) {
   const data = await callDriveBridge<CreateSessionResponse>({
     action: 'createUploadSession',
@@ -143,7 +144,8 @@ export async function createResumableUploadSession(args: {
     assignmentId: args.assignmentId,
     userId: args.userId,
     stageName: safeDriveName(args.stageName, 'Stage'),
-    lessonName: safeDriveName(args.lessonName, 'Lesson')
+    lessonName: safeDriveName(args.lessonName, 'Lesson'),
+    studentFolderName: safeDriveName(args.studentFolderName, 'student')
   });
 
   if (!data.sessionUrl) throw new Error('Apps Script did not return a resumable session URL');
@@ -158,4 +160,17 @@ export async function getDriveFile(fileId: string) {
 export async function findDriveFileBySubmissionId(submissionId: string) {
   const data = await callDriveBridge<FileResponse>({ action: 'findBySubmission', submissionId });
   return data.file ?? null;
+}
+
+
+/**
+ * Folder name for one student: "Sayyed El-Arishy - 0d25c04a".
+ *
+ * The short id is not decoration. Two students called Mohamed Ahmed would
+ * otherwise share a folder and their files would be indistinguishable — and
+ * Drive gives no warning when that happens.
+ */
+export function studentFolderName(fullName: string | null, email: string | null, userId: string) {
+  const person = safeDriveName(fullName || (email ? email.split('@')[0] : '') || 'student', 'student');
+  return `${person} - ${userId.replace(/-/g, '').slice(0, 8)}`.slice(0, 150);
 }

@@ -6,7 +6,8 @@ import {
   createResumableUploadSession,
   isGoogleDriveConfigured,
   lessonFolderName,
-  stageFolderName
+  stageFolderName,
+  studentFolderName
 } from '@/lib/google-drive';
 
 export const runtime = 'nodejs';
@@ -182,7 +183,8 @@ export async function POST(request: Request) {
         assignmentId,
         userId: user.id,
         stageName,
-        lessonName
+        lessonName,
+        studentFolderName: studentFolderName(profile.full_name, profile.email, user.id)
       });
 
       // Keep this field as a convenient admin hint/cache. The Apps Script

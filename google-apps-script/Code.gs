@@ -107,8 +107,25 @@ function createUploadSession_(payload) {
 
   if (!Number.isFinite(fileSize) || fileSize <= 0) throw new Error('Invalid file size.');
 
+  /*
+   * Student Submissions / <Student> / <Stage> / <Lesson> / file
+   *
+   * Every submission used to land straight in the lesson folder, so twenty
+   * students meant twenty near-identical filenames in one list — you could
+   * not open a student and see their work, only scan a wall of names.
+   *
+   * The student folder comes FIRST on purpose. Grading one lesson is a task
+   * you do once; looking at what one student has actually produced is a thing
+   * you do every time you answer them.
+   *
+   * The folder name carries a short id because two students can share a name,
+   * and Drive would happily merge their work into one folder.
+   */
+  const studentName = safeName_(payload.studentFolderName, 'student');
+
   const root = DriveApp.getFolderById(rootId);
-  const stageFolder = getOrCreateChildFolder_(root, stageName);
+  const studentFolder = getOrCreateChildFolder_(root, studentName);
+  const stageFolder = getOrCreateChildFolder_(studentFolder, stageName);
   const lessonFolder = getOrCreateChildFolder_(stageFolder, lessonName);
 
   const metadata = {

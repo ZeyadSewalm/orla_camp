@@ -13,6 +13,7 @@ import { createClient, getSessionUser } from '@/lib/supabase/server';
 import { getCachedProfile, getModules, getSiteSettings } from '@/lib/data';
 import type { Assignment, AssignmentSubmission, CourseModule, LessonProgress } from '@/lib/types';
 import { lh } from '@/lib/href';
+import { Lock } from 'lucide-react';
 
 export const metadata: Metadata = { robots: { index: false } };
 export const dynamic = 'force-dynamic';
@@ -100,12 +101,57 @@ export default async function Course({ params: { locale } }: { params: { locale:
     list.push(assignment);
     assignmentsByLesson.set(assignment.lesson_id, list);
   }
+  /*
+   * SEQUENTIAL UNLOCKING — computed on the server, enforced on the server.
+   *
+   * A lesson opens only when the one before it is finished: marked complete,
+   * AND every active task on it submitted. Staff bypass it entirely, or they
+   * could never review a later lesson.
+   *
+   * This is worked out here rather than in the browser because the gate has to
+   * be real. If the page shipped every video URL and merely hid the locked
+   * ones behind CSS, one look at the page source would hand a student the
+   * whole course on day one — which is exactly the leak we just closed on the
+   * free lesson. A locked module is sent with NO src at all.
+   */
   const latestTaskSubmissionByAssignment = new Map<string, AssignmentSubmission>();
   for (const submission of taskSubmissions) {
     if (!latestTaskSubmissionByAssignment.has(submission.assignment_id)) {
       latestTaskSubmissionByAssignment.set(submission.assignment_id, submission);
     }
   }
+
+  const isStaff = profile.role === 'admin' || profile.role === 'reviewer';
+
+  /**
+   * A lesson counts as finished when it is marked complete AND every active
+   * task on it has been submitted. A task still in `uploading` or `failed` has
+   * not been submitted — the file never arrived.
+   */
+  function lessonFinished(moduleId: string) {
+    if (!(progressByModule.get(moduleId)?.is_completed ?? false)) return false;
+    const tasks = assignmentsByLesson.get(moduleId) ?? [];
+    return tasks.every((task) => {
+      const sub = latestTaskSubmissionByAssignment.get(task.id);
+      return !!sub && !['uploading', 'failed'].includes(sub.status);
+    });
+  }
+
+  const unlockedModuleIds = new Set<string>();
+  for (let i = 0; i < modules.length; i += 1) {
+    const current = modules[i];
+    // The first lesson is always open, and so is anything already started —
+    // nobody who has begun a lesson should ever find it locked behind them.
+    const previous = i === 0 ? null : modules[i - 1];
+    const open =
+      isStaff ||
+      i === 0 ||
+      current.is_free_preview ||
+      progressByModule.has(current.id) ||
+      (previous ? lessonFinished(previous.id) : true);
+    if (open) unlockedModuleIds.add(current.id);
+  }
+
   const ar = locale === 'ar';
 
   const authName =
@@ -246,11 +292,14 @@ export default async function Course({ params: { locale } }: { params: { locale:
         )}
 
         <div className="mt-10 space-y-12 md:space-y-16">
-          {modules.map((m: CourseModule, i: number) => (
+          {modules.map((m: CourseModule, i: number) => {
+            const unlocked = unlockedModuleIds.has(m.id);
+            const previousTitle = i > 0 ? (ar ? modules[i - 1].title_ar : modules[i - 1].title_en) : '';
+            return (
             <article
               key={m.id}
               id={`lesson-${m.id}`}
-              className="scroll-mt-28 rounded-[2rem] border border-ink/10 bg-white p-4 soft-shadow sm:p-6 md:p-8"
+              className={`scroll-mt-28 rounded-[2rem] border border-ink/10 bg-white p-4 soft-shadow sm:p-6 md:p-8 ${unlocked ? '' : 'opacity-70'}`}
             >
               <div className="mb-5 flex items-start gap-4">
                 <span className="figure flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brass/10 text-xs font-medium text-brass">
@@ -262,6 +311,27 @@ export default async function Course({ params: { locale } }: { params: { locale:
                 </div>
               </div>
 
+              {!unlocked ? (
+                /*
+                  No <VideoEmbed> at all for a locked lesson — not a hidden
+                  one. The src is never computed, so it is not in the page
+                  source either.
+                */
+                <div className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-ink/20 bg-paper px-6 text-center">
+                  <Lock aria-hidden className="h-7 w-7 text-steel" />
+                  <p className="text-sm font-semibold">
+                    {ar ? 'هذا الدرس مقفل' : 'This lesson is locked'}
+                  </p>
+                  <p className="max-w-sm text-xs leading-relaxed text-steel">
+                    {ar
+                      ? `أكمِل درس «${previousTitle}» وسلّم مهمته لفتح هذا الدرس.`
+                      : `Finish “${previousTitle}” and submit its task to unlock this lesson.`}
+                  </p>
+                  <a href={`#lesson-${modules[i - 1]?.id ?? ''}`} className="btn-quiet mt-1 text-xs">
+                    {ar ? 'اذهب إلى الدرس السابق' : 'Go to the previous lesson'}
+                  </a>
+                </div>
+              ) : (
               <VideoEmbed
                 src={videoSrcFor(m)}
                 poster={m.thumbnail_url ?? (m.video_source === 'bunny' && m.bunny_video_id ? bunnyThumbnail(m.bunny_video_id) : null)}
@@ -269,8 +339,9 @@ export default async function Course({ params: { locale } }: { params: { locale:
                 moduleId={m.id}
                 durationMinutes={m.duration_minutes}
               />
+              )}
 
-              <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className={`mt-4 flex flex-wrap items-center gap-3 ${unlocked ? '' : 'hidden'}`}>
                 {m.checklist_file_url && (
                   <a href={m.checklist_file_url} target="_blank" rel="noopener" className="btn-quiet text-sm">
                     {t('checklist')}
@@ -294,7 +365,8 @@ export default async function Course({ params: { locale } }: { params: { locale:
                 />
               ))}
             </article>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>
