@@ -1,0 +1,70 @@
+import type { Currency, PromoCode, Region, Tier } from './types';
+
+export const currencyFor = (region: Region): Currency => (region === 'egypt' ? 'EGP' : 'USD');
+
+export function tierPrice(tier: Tier, region: Region) {
+  const currency = currencyFor(region);
+  const full = currency === 'EGP' ? tier.price_egp : tier.price_usd;
+  const installment = currency === 'EGP' ? tier.installment_price_egp : tier.installment_price_usd;
+  return { currency, full, installment, count: tier.installment_count ?? 3 };
+}
+
+/**
+ * Money, formatted for display.
+ *
+ * The Arabic locale is `ar-EG-u-nu-latn`, not `ar-EG`, and that `-u-nu-latn`
+ * is doing real work. Plain `ar-EG` formats with Arabic-Indic digits
+ * (٢٢٬٠٠٠). Those digits do not exist in IBM Plex Mono, which is the face the
+ * `.figure` class applies to every price on the site — so the browser fell
+ * back mid-number to whatever it could find, and the prices rendered as a
+ * mismatched jumble of glyphs at different weights and heights.
+ *
+ * Latin digits also match how prices are written on Egyptian invoices and in
+ * the sales sheet, so this reads more naturally anyway.
+ */
+export function formatMoney(amount: number, currency: Currency, locale: string) {
+  return new Intl.NumberFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0
+  }).format(amount);
+}
+
+/** Applies a promo code to an amount. Never returns below zero. */
+/**
+ * Escapes a user-supplied promo code before it reaches a SQL ILIKE.
+ *
+ * THIS IS A REAL HOLE, NOT A THEORETICAL ONE. The lookup used
+ * `.ilike('code', userInput)` with the raw input, and ILIKE treats `%` and `_`
+ * as wildcards. A buyer typing `%` matched EVERY row in promo_codes; typing
+ * `SAVE%` matched any code beginning SAVE. Whenever exactly one row matched —
+ * a single launch discount, or a guess narrowed by one prefix — the discount
+ * was applied. Someone could brute-force their way to a 100%-off admin code a
+ * character at a time without ever knowing it.
+ *
+ * Backslash is Postgres's default LIKE escape character, so escaping the two
+ * wildcards (and the backslash itself, first) makes the pattern literal while
+ * keeping ILIKE's case-insensitivity, which is what codes need.
+ */
+export function escapeLikePattern(input: string) {
+  return input.replace(/\\/g, '\\\\').replace(/[%_]/g, (c) => `\\${c}`);
+}
+
+export function applyDiscount(amount: number, promo: PromoCode) {
+  const off = promo.discount_type === 'percentage' ? (amount * promo.discount_value) / 100 : promo.discount_value;
+  return Math.max(0, Math.round((amount - off) * 100) / 100);
+}
+
+/** Server-side promo validation. Returns a reason key when the code can't be used. */
+export function validatePromo(promo: PromoCode | null, tierId: string): { ok: true } | { ok: false; reason: string } {
+  if (!promo) return { ok: false, reason: 'notFound' };
+  if (!promo.is_active) return { ok: false, reason: 'inactive' };
+  if (promo.expires_at && new Date(promo.expires_at) < new Date()) return { ok: false, reason: 'expired' };
+  if (promo.max_uses !== null && promo.used_count >= promo.max_uses) return { ok: false, reason: 'exhausted' };
+  if (promo.applicable_tiers && promo.applicable_tiers.length > 0 && !promo.applicable_tiers.includes(tierId))
+    return { ok: false, reason: 'wrongTier' };
+  return { ok: true };
+}
+
+export const seatsLeft = (tier: Tier) =>
+  tier.max_seats === null ? null : Math.max(0, tier.max_seats - (tier.current_seats_taken ?? 0));
