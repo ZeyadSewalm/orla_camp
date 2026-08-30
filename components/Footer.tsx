@@ -21,7 +21,6 @@ export default async function Footer({ locale }: { locale: string }) {
           </div>
 
           <div className="self-end">
-            <p className="max-w-sm text-base leading-relaxed text-white/80">{p('noCert')}</p>
             <nav className="mt-7 flex flex-wrap gap-2 text-sm font-semibold">
               <Link className="rounded-full bg-white px-5 py-2.5 text-ink hover:bg-brandSun" href={lh(locale, '/pricing')}>{t('pricing')}</Link>
               <Link className="rounded-full border border-white/35 px-5 py-2.5 hover:bg-white hover:text-ink" href={lh(locale, '/faq')}>{t('faq')}</Link>

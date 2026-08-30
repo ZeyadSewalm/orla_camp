@@ -2,10 +2,11 @@ import Link from 'next/link';
 import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
 import Logo from '@/components/Logo';
 import HeroMark from '@/components/HeroMark';
+import Reveal from '@/components/Reveal';
 import MagneticButton from '@/components/MagneticButton';
 import Curriculum from '@/components/Curriculum';
 import TierComparison from '@/components/TierComparison';
-import { getModules, getSiteSettings, getTiers } from '@/lib/data';
+import { getTiers } from '@/lib/data';
 import { lh } from '@/lib/href';
 import { seatsLeft } from '@/lib/pricing';
 
@@ -19,11 +20,10 @@ export default async function Home({ params: { locale } }: { params: { locale: s
   const t = await getTranslations('home');
   const f = await getTranslations('faq');
   const p = await getTranslations('pricing');
-  const [settings, modules, tiers] = await Promise.all([
-    getSiteSettings(),
-    getModules(),
-    getTiers()
-  ]);
+  // `modules` used to be fetched here and never read. It is a whole extra
+  // Supabase round trip on the site's busiest page, and since migration-007 it
+  // is a service-role read of the paid video columns for no reason at all.
+  const tiers = await getTiers();
 
   const ar = locale === 'ar';
   const partner = tiers.find((x) => x.slug === 'production_partner');
@@ -40,7 +40,8 @@ export default async function Home({ params: { locale } }: { params: { locale: s
   };
 
   const included = [t('included1'), t('included2'), t('included3'), t('included4'), t('included5')];
-  const faqs = [1, 2, 3, 4, 5].map((n) => [f(`q${n}` as 'q1'), f(`a${n}` as 'a1')]);
+  // Four questions now — the certificate Q&A was removed on request.
+  const faqs = [1, 2, 3, 4].map((n) => [f(`q${n}` as 'q1'), f(`a${n}` as 'a1')]);
 
   return (
     <>
@@ -48,23 +49,34 @@ export default async function Home({ params: { locale } }: { params: { locale: s
 
       {/* ── 1. HERO ── */}
       <section className="relative overflow-hidden px-3 pb-4 pt-6 md:px-5 md:pt-8">
-        <div aria-hidden className="absolute -start-10 top-12 h-32 w-32 rotate-12 bg-brandSun md:h-44 md:w-44" />
-        <div aria-hidden className="absolute -end-10 bottom-10 h-32 w-32 rounded-full bg-brandCoral md:h-40 md:w-40" />
+        {/* Decorative only — hidden on phones, where they sat under the text
+            and forced horizontal scroll. */}
+        <div aria-hidden className="parallax-fast absolute -start-10 top-12 hidden h-32 w-32 rotate-12 bg-brandSun sm:block md:h-44 md:w-44" />
+        <div aria-hidden className="parallax-slow absolute -end-10 bottom-10 hidden h-32 w-32 rounded-full bg-brandCoral sm:block md:h-40 md:w-40" />
 
-        <div className="soft-shadow relative mx-auto grid max-w-[90rem] items-center gap-12 overflow-hidden rounded-[2.25rem] border border-ink/10 bg-white px-6 py-14 md:grid-cols-[1.1fr_0.9fr] md:px-12 md:py-16 lg:px-16">
+        <div className="soft-shadow relative mx-auto grid max-w-[90rem] items-center gap-10 overflow-hidden rounded-[1.5rem] border border-ink/10 bg-white px-5 py-10 sm:rounded-[2.25rem] sm:px-6 sm:py-14 md:grid-cols-[1.1fr_0.9fr] md:gap-12 md:px-12 md:py-16 lg:px-16">
           <span aria-hidden className="facet-field pointer-events-none absolute inset-0 text-brass" />
           <div className="rise">
             <p className="mb-7 inline-flex items-center gap-2.5 rounded-full bg-paper px-4 py-2 text-xs font-semibold text-steel">
               <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-brass" />
               {t('kicker')}
             </p>
-            <h1 className="display relative max-w-3xl text-[clamp(3rem,6.2vw,5rem)]">{t('headline')}</h1>
+            {/* Size lives in .h-hero, which carries a separate clamp for
+                Arabic — see globals.css. A single shared clamp is what made
+                the Arabic headline run to seven lines and swallow the fold. */}
+            <h1 className="display h-hero relative max-w-3xl">{t('headline')}</h1>
             <div className="rule-diagonal my-7 text-brass" />
-            <p className="max-w-2xl text-lg leading-relaxed text-steel md:text-xl">{t('subhead')}</p>
+            {/* Was text-lg → md:text-xl, i.e. a 40px body paragraph on
+                desktop under the custom scale. Body copy stays body-sized. */}
+            <p className="max-w-2xl text-base leading-relaxed text-steel md:text-lg">{t('subhead')}</p>
 
-            <div className="mt-10 flex flex-wrap items-center gap-3">
-              <MagneticButton href={lh(locale, '/signup')} className="btn-brass">{t('ctaPrimary')}</MagneticButton>
-              <a href="#curriculum" className="btn-quiet">{t('ctaSecondary')}</a>
+            {/* Full-width stacked on a phone, side by side from 400px up —
+                two half-width buttons on a 360px screen wrap their labels. */}
+            <div className="mt-9 flex flex-col gap-3 xs:flex-row xs:flex-wrap xs:items-center md:mt-10">
+              <MagneticButton href={lh(locale, '/pricing#plans')} className="btn-brass w-full justify-center xs:w-auto">{p('subscribe')}</MagneticButton>
+              {/* Keep the free lesson available, but make subscription the primary commercial CTA. */}
+              <Link href={lh(locale, '/free-lesson')} className="btn-quiet w-full justify-center xs:w-auto">{t('ctaPrimary')}</Link>
+              <a href="#curriculum" className="btn-outline w-full justify-center xs:w-auto">{t('ctaSecondary')}</a>
             </div>
 
             {left !== null && left > 0 && (
@@ -75,15 +87,21 @@ export default async function Home({ params: { locale } }: { params: { locale: s
             )}
           </div>
 
-          <div className="relative hidden md:block">
-            {/*
-              The hero always shows the mark. The uploaded landing image used
-              to render here, which meant any stock photo saved in the admin
-              replaced the brand at the most important point on the site.
-              That image is still available for social previews and elsewhere;
-              it just no longer outranks the logo.
-            */}
-            <HeroMark className="h-[28rem] w-full max-w-[25rem]" />
+          {/*
+            VISIBLE ON EVERY SIZE.
+
+            This was `hidden md:block`, so the entire brand mark vanished on
+            phones and on any narrow desktop window — the hero became a wall of
+            text with no image at all, on the one screen most visitors actually
+            see. Hiding the logo is not a responsive strategy.
+
+            `order-first` on mobile puts the mark ABOVE the headline, which is
+            how the eye expects it; from `md` the grid takes over and it
+            returns to its column beside the copy. It is also smaller on a
+            phone so it introduces the page rather than filling it.
+          */}
+          <div className="relative order-first flex justify-center md:order-none md:block">
+            <HeroMark className="h-[15rem] w-full max-w-[15rem] sm:h-[19rem] sm:max-w-[19rem] md:h-[28rem] md:max-w-[25rem]" />
           </div>
         </div>
       </section>
@@ -92,13 +110,20 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       <section className="relative mx-3 mt-1 overflow-hidden rounded-[2.25rem] bg-brandSun py-16 md:mx-5 md:py-20">
         <div aria-hidden className="brand-grid pointer-events-none absolute inset-0 opacity-30" />
         <div className="relative mx-auto max-w-content px-5">
-        <h2 className="display text-4xl md:text-[3.5rem]">{t('problemTitle')}</h2>
-        <p className="mt-8 max-w-3xl text-2xl font-semibold leading-snug md:text-3xl">{t('problem1')}</p>
+        <Reveal as="h2" className="display h-section">{t('problemTitle')}</Reveal>
+        {/* text-2xl is 64px under this project's scale, so the mobile size was
+            larger than the md: size. Now it climbs instead of collapsing. */}
+        <p className="mt-8 max-w-3xl text-xl font-semibold leading-snug sm:text-2xl">{t('problem1')}</p>
         <div className="mt-8 grid gap-8 md:grid-cols-2">
           <p className="leading-relaxed text-ink/70">{t('problem2')}</p>
           <p className="leading-relaxed text-ink/70">{t('problem3')}</p>
         </div>
-          <p className="mt-12 border-s-2 border-brass ps-7 font-display text-lg font-black">{t('problemClose')}</p>
+          <p className="mt-12 border-s-2 border-brass ps-5 font-display text-lg font-black md:ps-7">{t('problemClose')}</p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link href={lh(locale, '/pricing#plans')} className="btn-primary w-full justify-center xs:w-auto">
+              {p('subscribe')}
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -109,15 +134,20 @@ export default async function Home({ params: { locale } }: { params: { locale: s
         <div className="relative mx-auto max-w-content px-5 py-16 md:py-20">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/70">{t('instructorKicker')}</p>
           <div className="mt-6 flex flex-col gap-10 md:flex-row md:items-start">
-            <div className="flex h-40 w-40 shrink-0 items-center justify-center rounded-full bg-white p-7 text-ink">
+            <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full bg-white p-5 text-ink md:h-40 md:w-40 md:p-7">
               <Logo className="h-full w-auto" />
             </div>
             <div>
-              <h2 className="display text-4xl md:text-5xl">{t('instructorTitle')}</h2>
-              <div className="mt-6 max-w-3xl space-y-5 text-lg leading-relaxed text-white/75">
+              <Reveal as="h2" className="display h-section">{t('instructorTitle')}</Reveal>
+              <div className="mt-6 max-w-3xl space-y-5 text-base leading-relaxed text-white/75 md:text-lg">
                 <p>{t('instructor1')}</p>
                 <p>{t('instructor2')}</p>
                 <p className="text-white">{t('instructor3')}</p>
+              </div>
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <Link href={lh(locale, '/pricing#plans')} className="btn-on-dark w-full justify-center xs:w-auto">
+                  {p('subscribe')}
+                </Link>
               </div>
             </div>
           </div>
@@ -127,16 +157,28 @@ export default async function Home({ params: { locale } }: { params: { locale: s
       {/* ── 4. CURRICULUM ── */}
       <section id="curriculum" className="scroll-mt-24">
         <div className="mx-auto max-w-content px-5 py-20">
-          <h2 className="display text-4xl md:text-[3.5rem]">{t('curriculumTitle')}</h2>
+          <Reveal as="h2" className="display h-section">{t('curriculumTitle')}</Reveal>
           <p className="mt-4 max-w-2xl italic text-steel">{t('curriculumNote')}</p>
           <Curriculum locale={locale} labels={{ available: t('statusAvailable'), coming: t('statusComing') }} />
           <p className="mt-12 max-w-3xl border-s-4 border-brass ps-6 italic text-steel">{t('curriculumFooter')}</p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link href={lh(locale, '/pricing#plans')} className="btn-primary w-full justify-center xs:w-auto">
+              {p('subscribe')}
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* ── 5. TIER COMPARISON ── */}
+      {/* ── 5. TIER COMPARISON ──
+          Guarded on `tiers`: TierComparison returns null when the table is
+          empty, and without this the section still printed its heading and
+          intro over nothing at all. That only happens when Supabase is
+          unreachable — which the fail-soft data layer now allows the page to
+          survive — so the page has to survive it looking right too, not just
+          without throwing. */}
+      {tiers.length > 0 && (
       <section className="mx-auto max-w-content px-5 py-16 md:py-20">
-        <h2 className="display text-4xl md:text-[3.5rem]">{t('comparisonTitle')}</h2>
+        <Reveal as="h2" className="display h-section">{t('comparisonTitle')}</Reveal>
         <p className="mt-4 max-w-3xl italic text-steel">{t('comparisonNote')}</p>
         <TierComparison
           tiers={tiers}
@@ -151,60 +193,74 @@ export default async function Home({ params: { locale } }: { params: { locale: s
         <p className="surface-card mt-8 max-w-3xl p-6 text-sm leading-relaxed text-steel">
           {t('partnerNote')}
         </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link href={lh(locale, '/pricing')} className="btn-primary">{p('subscribe')}</Link>
-          <Link href={lh(locale, '/apply-production-partner')} className="btn-outline">{p('requestCall')}</Link>
+        <div className="mt-8 flex flex-col gap-3 xs:flex-row xs:flex-wrap">
+          <Link href={lh(locale, '/pricing#plans')} className="btn-primary w-full justify-center xs:w-auto">{p('subscribe')}</Link>
+          <Link href={lh(locale, '/apply-production-partner')} className="btn-outline w-full justify-center xs:w-auto">{p('requestCall')}</Link>
         </div>
       </section>
+      )}
 
       {/* ── 6. WHAT'S INCLUDED ── */}
       <section className="mx-3 overflow-hidden rounded-[2.25rem] bg-white md:mx-5">
         <div className="mx-auto max-w-content px-5 py-16 md:py-20">
-          <h2 className="display text-4xl md:text-[3.5rem]">{t('includedTitle')}</h2>
+          <Reveal as="h2" className="display h-section">{t('includedTitle')}</Reveal>
           <ul className="mt-10 grid gap-3 md:grid-cols-2">
             {included.map((line, i) => (
-              <li key={i} className="flex gap-4 rounded-3xl bg-paper p-7">
+              <li key={i} className="flex gap-4 rounded-2xl bg-paper p-5 sm:rounded-3xl sm:p-7">
                 <span className="figure flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brass text-xs text-white">{String(i + 1).padStart(2, '0')}</span>
                 <span className="leading-relaxed text-steel">{line}</span>
               </li>
             ))}
           </ul>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link href={lh(locale, '/pricing#plans')} className="btn-primary w-full justify-center xs:w-auto">
+              {p('subscribe')}
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* ── 7. PRICING + PAYMENT PLANS ── */}
       <section className="mx-auto max-w-content px-5 py-20">
-        <h2 className="display text-4xl md:text-5xl">{t('pricingTitle')}</h2>
-        <div className="mt-8 grid max-w-4xl gap-6 md:grid-cols-2">
-          <p className="leading-relaxed text-steel">{t('pricing1')}</p>
+        <Reveal as="h2" className="display h-section">{t('pricingTitle')}</Reveal>
+        <div className="mt-8 grid max-w-4xl gap-6">
           <p className="leading-relaxed text-steel">{t('pricing2')}</p>
         </div>
-        <MagneticButton href={lh(locale, '/pricing')} className="btn-brass mt-9">{p('subscribe')}</MagneticButton>
+        <div className="mt-9 flex flex-wrap items-center gap-3">
+          <MagneticButton href={lh(locale, '/pricing#plans')} className="btn-brass w-full justify-center xs:w-auto">{p('subscribe')}</MagneticButton>
+        </div>
       </section>
 
       {/* ── 8. FAQ ── */}
       <section className="mx-3 overflow-hidden rounded-[2.25rem] bg-white md:mx-5">
         <div className="mx-auto max-w-content px-5 py-20">
-          <h2 className="display text-4xl md:text-[3.5rem]">{f('title')}</h2>
+          <Reveal as="h2" className="display h-section">{f('title')}</Reveal>
           <dl className="mt-10 max-w-3xl">
             {faqs.map(([q, a]) => (
-              <div key={q} className="mb-3 rounded-3xl bg-paper p-6">
-                <dt className="text-lg font-semibold">{q}</dt>
+              <div key={q} className="mb-3 rounded-2xl bg-paper p-5 sm:rounded-3xl sm:p-6">
+                <dt className="text-base font-semibold md:text-lg">{q}</dt>
                 <dd className="mt-2 leading-relaxed text-steel">{a}</dd>
               </div>
             ))}
           </dl>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link href={lh(locale, '/pricing#plans')} className="btn-primary w-full justify-center xs:w-auto">
+              {p('subscribe')}
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* ── 9. FINAL CTA ── */}
       <section className="mx-auto max-w-content px-5 py-20">
-        <div className="relative overflow-hidden rounded-[2.25rem] bg-brass p-10 text-white md:p-16">
+        <div className="relative overflow-hidden rounded-[1.5rem] bg-brass p-7 text-white sm:rounded-[2.25rem] sm:p-10 md:p-16">
           <div aria-hidden className="facet-field pointer-events-none absolute inset-0 text-white/25" />
           <div className="relative">
-            <h2 className="display max-w-4xl text-4xl md:text-[4.5rem]">{t('finalTitle')}</h2>
-            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/85">{t('finalBody')}</p>
-            <Link href={lh(locale, '/pricing')} className="btn-on-dark mt-9">{t('finalCta')}</Link>
+            <Reveal as="h2" className="display h-final max-w-4xl">{t('finalTitle')}</Reveal>
+            <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/85 md:text-lg">{t('finalBody')}</p>
+            <div className="mt-9 flex flex-wrap items-center gap-3">
+              <Link href={lh(locale, '/pricing#plans')} className="btn-on-dark w-full justify-center xs:w-auto">{p('subscribe')}</Link>
+            </div>
           </div>
         </div>
       </section>

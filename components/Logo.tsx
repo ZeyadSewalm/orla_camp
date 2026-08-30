@@ -25,10 +25,33 @@ export default function Logo({ className = 'h-10 w-auto' }: { className?: string
   );
 }
 
-export function Wordmark({ className = '' }: { className?: string }) {
+export function Wordmark({ className = '', dir }: { className?: string; dir?: 'ltr' | 'rtl' }) {
   return (
-    <span className={['brand-wordmark block uppercase leading-[0.76]', className].join(' ')}>
+    // leading comes from .brand-wordmark now — the old leading-[0.76] here was
+    // overriding it and slicing the letterforms.
+    //
+    // `dir` is accepted because this is a LATIN lockup. On an Arabic (rtl)
+    // page the browser will otherwise reorder and right-align the three lines,
+    // which is wrong for a fixed brand mark — it should look identical in both
+    // languages.
+    <span dir={dir} className={['brand-wordmark block uppercase', className].join(' ')}>
       ORLA<br />DENT<br />CAMP
+    </span>
+  );
+}
+
+/**
+ * One-line wordmark, for the mobile header.
+ *
+ * The three-line stack is a lockup for large surfaces. Shrunk to fit beside a
+ * 32px logo in a phone header it becomes three rows of ~9px text — present in
+ * the DOM, but unreadable, which is why the site looked nameless on a phone.
+ * One line at a legible size says the name properly in the space available.
+ */
+export function WordmarkInline({ className = '' }: { className?: string }) {
+  return (
+    <span dir="ltr" className={['brand-wordmark block whitespace-nowrap uppercase', className].join(' ')}>
+      ORLADENT CAMP
     </span>
   );
 }

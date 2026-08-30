@@ -1,12 +1,7 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import { Suspense } from 'react';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations, unstable_setRequestLocale } from 'next-intl/server';
-import '@fontsource-variable/fraunces';
-import '@fontsource-variable/inter';
-import '@fontsource/ibm-plex-mono/400.css';
-import '@fontsource/ibm-plex-mono/500.css';
-import '@fontsource/ibm-plex-mono/600.css';
-import '@fontsource-variable/noto-kufi-arabic';
 import { notFound } from 'next/navigation';
 import { locales, dir, type Locale } from '@/i18n';
 import { lh } from '@/lib/href';
@@ -15,16 +10,38 @@ import RouteProgress from '@/components/RouteProgress';
 import Footer from '@/components/Footer';
 import '../globals.css';
 
-const fontVariables = {
-  '--font-fraunces': '"Fraunces Variable"',
-  '--font-inter': '"Inter Variable"',
-  '--font-plex-mono': '"IBM Plex Mono"',
-  '--font-kufi': '"Noto Kufi Arabic Variable"'
-} as React.CSSProperties;
+/**
+ * Identifies this build in the served HTML. Vercel injects the commit SHA;
+ * locally it falls back to the timestamp of the build.
+ */
+const BUILD_ID =
+  process.env.NEXT_PUBLIC_BUILD_ID ??
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ??
+  `local-${new Date().toISOString().slice(0, 16)}`;
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
+
+/**
+ * The viewport meta tag, declared explicitly.
+ *
+ * Next 14 injects a default one, but relying on that is fragile — the moment
+ * anything else defines `viewport` the default is dropped, and without it a
+ * phone renders the page at 980px wide and scales it down. Everything then
+ * looks "zoomed out and broken" no matter how good the CSS is.
+ *
+ * maximumScale is deliberately 5 and userScalable stays on: pinch-zoom is an
+ * accessibility requirement, and disabling it is a common mistake made while
+ * chasing exactly this bug.
+ */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: '#F5EFE6'
+};
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: 'home' });
@@ -43,9 +60,21 @@ export async function generateMetadata({ params: { locale } }: { params: { local
     openGraph: {
       title, description, url: `${site}${lh(locale)}`, siteName: title,
       locale: locale === 'ar' ? 'ar_EG' : 'en_US',
-      images: [{ url: '/logo/orladent-logo.svg', width: 543, height: 937, alt: title }]
+      /*
+       * PNG, 1200x630 — not the logo SVG.
+       *
+       * WhatsApp, Facebook, LinkedIn and X do not render SVG previews. Every
+       * time someone shared this link the card came up blank, and on WhatsApp
+       * — which is how this audience actually shares things — that is the
+       * first impression of a product costing five figures in EGP.
+       *
+       * 1200x630 is also the shape `summary_large_image` expects. The old
+       * asset was 543x937, portrait: even as a PNG it would have been cropped
+       * to a sliver.
+       */
+      images: [{ url: '/og-image.png', width: 1200, height: 630, alt: title }]
     },
-    twitter: { card: 'summary_large_image', title, description, images: ['/logo/orladent-logo.svg'] },
+    twitter: { card: 'summary_large_image', title, description, images: ['/og-image.png'] },
     icons: { icon: '/logo/orladent-logo.svg' }
   };
 }
@@ -62,10 +91,53 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} dir={dir(locale)} style={fontVariables}>
+    <html lang={locale} dir={dir(locale)}>
+      <head>
+        {/*
+          Preload only the face that actually paints this locale's first
+          screen. Without this the browser has to download the CSS, parse it,
+          discover the @font-face, and only THEN start the font request —
+          three serial round trips before any real text appears. Arabic gets
+          Almarai, English gets Inter; neither pays for the other's file.
+        */}
+        <link
+          rel="preload"
+          as="font"
+          type="font/woff2"
+          href={locale === 'ar' ? '/fonts/almarai-arabic-400.woff2' : '/fonts/inter-latin.woff2'}
+          crossOrigin="anonymous"
+        />
+
+        {/*
+          BUILD STAMP — so you can tell what is actually deployed.
+
+          Vercel keeps serving the previous build until a new one finishes, and
+          a phone will happily show a cached page for a long time after that.
+          That combination makes it very easy to look at an old site and think
+          a fix did not work. View source (or check the console) and read this
+          value: if it is not the build you just pushed, you are looking at an
+          old page, not a broken fix.
+        */}
+        <meta name="x-build" content={BUILD_ID} />
+      </head>
       <body>
         <NextIntlClientProvider messages={messages}>
-          <RouteProgress />
+          {/*
+            Suspense is REQUIRED here, not decorative.
+
+            RouteProgress reads useSearchParams() so it can tell when an
+            admin-panel navigation has arrived — those change only the query
+            string, never the pathname. In the App Router, useSearchParams
+            without a Suspense boundary opts every statically-rendered page in
+            the tree into client-side rendering, and `next build` fails with
+            "useSearchParams() should be wrapped in a suspense boundary".
+
+            The fallback is null on purpose: the progress bar has nothing
+            meaningful to show before it hydrates.
+          */}
+          <Suspense fallback={null}>
+            <RouteProgress />
+          </Suspense>
           <div className="flex min-h-screen flex-col">
             <Header locale={locale} />
             <main className="flex-1">{children}</main>

@@ -20,12 +20,7 @@ export const COMPARISON_ROWS: ComparisonRow[] = [
     foundation: true, freelance: true, partner: true
   },
   {
-    ar: 'تشيك ليست قابلة للتحميل لكل موديول',
-    en: 'Downloadable checklists per module',
-    foundation: true, freelance: true, partner: true
-  },
-  {
-    ar: 'مراجعة QC لملف الحالة (حتى ملف واحد لكل موديول، يراجعه Badr أو مصمم من OrlaDent)',
+    ar: 'مراجعة جودة لملف الحالة (حتى ملف واحد لكل وحدة، يراجعه Badr أو أحد مصمّمي OrlaDent)',
     en: 'Case file QC review (up to 1 per module, reviewed by Badr or an OrlaDent designer)',
     foundation: true, freelance: true, partner: true
   },

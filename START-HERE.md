@@ -64,6 +64,24 @@ update tiers set price_egp = 15000, installment_price_egp = 5500,
 where slug = 'freelance_ready';
 ```
 
+
+## مهام STL على Google Drive — بدون Google Cloud Console
+
+1. شغّل `supabase/migration-011-stl-tasks-drive.sql` مرة واحدة في Supabase → SQL Editor.
+2. افتح `script.google.com` واعمل New project.
+3. انسخ ملف `google-apps-script/Code.gs` إلى Apps Script.
+4. شغّل Function اسمها `setupOrlaDrive` مرة واحدة ووافق على صلاحية Google Drive.
+5. Deploy → Web app → Execute as **Me** → Access **Anyone**.
+6. أضف إلى Vercel فقط:
+   - `GOOGLE_APPS_SCRIPT_URL`
+   - `GOOGLE_APPS_SCRIPT_SECRET`
+   - `TASK_UPLOAD_MAX_MB` (اختياري)
+7. اعمل Redeploy ثم أنشئ Task من Admin → **مهام الطلاب / Student tasks**.
+
+لا يوجد Client ID أو Client Secret أو `npm run setup-drive` في هذه النسخة.
+
+التفاصيل الكاملة موجودة في `GOOGLE-DRIVE-STL-SETUP.md`.
+
 ## قبل النشر
 
 - اعمل rotate للـ service_role key من Supabase (اتعرض في محادثة سابقة)

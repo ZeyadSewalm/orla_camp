@@ -48,20 +48,36 @@ export default async function WhoAmI({ params: { locale } }: { params: { locale:
         </div>
       )}
 
-      {!profile && user && (
-        <div className="mt-6 border-2 border-brass bg-brass/5 p-5 text-sm">
-          <p className="font-medium">No profile row — run this in the Supabase SQL editor:</p>
-          <pre className="mt-3 overflow-x-auto bg-ink p-4 text-xs text-paper">{`insert into profiles (id, email, role, has_access)
-values ('${user.id}', '${user.email}', 'admin', true)
-on conflict (id) do update set role = 'admin', has_access = true;`}</pre>
-        </div>
-      )}
+      {/*
+        NO SQL SNIPPETS HERE ANY MORE.
 
-      {profile && profile.role !== 'admin' && (
-        <div className="mt-6 border-2 border-brass bg-brass/5 p-5 text-sm">
-          <p className="font-medium">You have a profile but you are not an admin. Run this, then log out and back in:</p>
-          <pre className="mt-3 overflow-x-auto bg-ink p-4 text-xs text-paper">{`update profiles set role = 'admin', has_access = true
-where email = '${profile.email}';`}</pre>
+        This page used to print a ready-to-paste statement — `update profiles
+        set role = 'admin' ... where email = '<yours>'` — to any signed-in
+        visitor who was not an admin. It is a public page, so that handed
+        every student the exact table, columns and values needed for privilege
+        escalation, pre-filled with their own address. Running it needs the
+        service-role key, so it was never directly exploitable; it was a map,
+        published to the people most likely to want it.
+
+        The diagnostics above are the useful part and they stay. Fixing an
+        account is now pointed at the admin script, which needs a key only the
+        owner has.
+      */}
+      {user && (!profile || profile.role !== 'admin') && (
+        <div className="mt-6 border-2 border-brass bg-brass/5 p-5 text-sm leading-relaxed">
+          <p className="font-medium">
+            {profile
+              ? 'You have a profile, but you are not an administrator.'
+              : 'No profile row was created for this account.'}
+          </p>
+          <p className="mt-2 text-steel">
+            Run this from the project on your own machine, then log out and back in:
+          </p>
+          <pre className="mt-3 overflow-x-auto bg-ink p-4 text-xs text-paper">{`npm run create-admin -- ${user.email} '<a-strong-password>'`}</pre>
+          <p className="mt-3 text-xs text-steel">
+            It repairs a missing profile, grants admin, and confirms the email in one step.
+            Run <code>npm run check-auth</code> first if you want to see what is wrong before changing anything.
+          </p>
         </div>
       )}
 

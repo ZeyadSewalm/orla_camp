@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
 import { getProfile } from '@/lib/supabase/server';
@@ -8,13 +9,16 @@ import {
   Card, Field, Sidebar, Stat, Empty, Pill, TABS, REVIEWER_TABS, type Tab
 } from '@/components/admin/Shell';
 import CaseFileLink from '@/components/admin/CaseFileLink';
+import SubmitButton, { SubmitLink } from '@/components/SubmitButton';
 import { Users, Wallet, ClipboardCheck, Coins } from 'lucide-react';
 import BunnyUpload from '@/components/admin/BunnyUpload';
 import { isBunnyConfigured } from '@/lib/bunny';
+import { isGoogleDriveConfigured } from '@/lib/google-drive';
 import {
   updateTier, saveModule, deleteModule, reviewCaseFile, updateRequest,
   grantProductionPartner, saveSession, deleteSession, saveCommunity, savePromo,
-  deletePromo, saveSettings, updateStudent, recordManualPayment
+  deletePromo, saveSettings, updateStudent, recordManualPayment,
+  saveAssignment, deleteAssignment, reviewAssignmentSubmission
 } from './actions';
 
 export const metadata: Metadata = { robots: { index: false } };
@@ -25,7 +29,7 @@ export default async function Admin({
   searchParams
 }: {
   params: { locale: string };
-  searchParams: { tab?: string; student?: string; case?: string };
+  searchParams: { tab?: string; student?: string; case?: string; submission?: string };
 }) {
   unstable_setRequestLocale(locale);
 
@@ -51,6 +55,10 @@ export default async function Admin({
     .from('case_file_submissions')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'pending');
+  const { count: pendingTaskCount } = await db
+    .from('assignment_submissions')
+    .select('*', { count: 'exact', head: true })
+    .in('status', ['submitted', 'resubmitted', 'under_review']);
   const save = t('save');
   const crud = { save, add: t('add'), del: t('delete'), emptyModules: t('emptyModules'), emptyModulesBody: t('emptyModulesBody') };
 
@@ -64,13 +72,15 @@ export default async function Admin({
       </div>
 
       <div className="grid gap-10 lg:grid-cols-[13rem_1fr]">
-        <Sidebar locale={locale} active={tab} labels={labels} groupLabels={groupLabels} allowed={allowed} pendingQC={pendingQCCount ?? 0} />
+        <Sidebar locale={locale} active={tab} labels={labels} groupLabels={groupLabels} allowed={allowed} pendingQC={pendingQCCount ?? 0} pendingTasks={pendingTaskCount ?? 0} />
 
         <div className="min-w-0">
           {tab === 'dashboard' && <Dashboard db={db} locale={locale} t={t} />}
           {tab === 'students' && <Students db={db} locale={locale} save={save} studentId={searchParams.student} t={t} />}
+          {tab === 'leads' && <Leads db={db} locale={locale} />}
           {tab === 'payments' && <Payments db={db} locale={locale} t={t} />}
           {tab === 'modules' && <Modules db={db} t={crud} />}
+          {tab === 'tasks' && <Tasks db={db} locale={locale} submissionId={searchParams.submission} isReviewer={isReviewer} />}
           {tab === 'qc' && <QC db={db} save={save} locale={locale} caseId={searchParams.case} t={t} />}
           {tab === 'tiers' && <Tiers db={db} save={save} />}
           {tab === 'requests' && <Requests db={db} save={save} />}
@@ -101,7 +111,7 @@ async function Tiers({ db, save }: { db: DB; save: string }) {
             <Field label="Name (EN)"><input name="name_en" defaultValue={tier.name_en} className="field" /></Field>
             <Field label="Description (AR)"><textarea name="description_ar" rows={2} defaultValue={tier.description_ar ?? ''} className="field" /></Field>
             <Field label="Description (EN)"><textarea name="description_en" rows={2} defaultValue={tier.description_en ?? ''} className="field" /></Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 xs:grid-cols-2">
               <Field label="Price EGP"><input name="price_egp" type="number" step="1" defaultValue={tier.price_egp ?? ''} className="field" /></Field>
               <Field label="Price USD"><input name="price_usd" type="number" step="1" defaultValue={tier.price_usd ?? ''} className="field" /></Field>
               <Field label="Instalment EGP"><input name="installment_price_egp" type="number" defaultValue={tier.installment_price_egp ?? ''} className="field" /></Field>
@@ -113,7 +123,7 @@ async function Tiers({ db, save }: { db: DB; save: string }) {
               <input type="checkbox" name="installments_available" defaultChecked={tier.installments_available} className="h-4 w-4" />
               Instalments on
             </label>
-            <button className="btn-primary w-full">{save}</button>
+            <SubmitButton className="btn-primary w-full">{save}</SubmitButton>
           </form>
         </Card>
       ))}
@@ -189,13 +199,54 @@ async function Modules({ db, t }: { db: DB; t: { save: string; add: string; del:
         Free preview — viewable without a paid plan
       </label>
 
-      <button className="btn-primary">{m ? t.save : t.add}</button>
+      <SubmitButton>{m ? t.save : t.add}</SubmitButton>
     </form>
   );
 
   return (
     <div className="space-y-6">
       <Card><h2 className="mb-5 font-display text-lg font-bold">New module</h2>{form()}</Card>
+
+      {/*
+        FREE LESSON STATUS — tells you what /free-lesson is actually serving.
+
+        The page shows whichever flagged module comes FIRST by order_index, so
+        ticking "free preview" on three modules quietly publishes only one of
+        them and hides the other two. Without this banner the only way to find
+        out was to open the public page and guess.
+      */}
+      {(() => {
+        const free = (modules ?? []).filter((m) => m.is_free_preview);
+        const live = free[0];
+        return (
+          <Card className={live ? '' : 'border-brass'}>
+            <p className="label mb-2">Free lesson — what /free-lesson is serving</p>
+            {!live ? (
+              <p className="text-sm text-steel">
+                No module is flagged as the free preview, so the public page shows
+                “coming soon”. Tick <strong>Free preview</strong> on the module you want to give away.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm">
+                  <strong>{live.title_en}</strong>{' '}
+                  {live.video_source === 'bunny' && live.bunny_video_id
+                    ? '— Bunny video attached'
+                    : live.video_link
+                      ? '— Drive link attached'
+                      : '— ⚠ no video attached, the page will show an empty player'}
+                </p>
+                {free.length > 1 && (
+                  <p className="mt-2 text-sm text-brass">
+                    ⚠ {free.length} modules are flagged free. Only the first by order_index
+                    ({live.title_en}) is published; the rest are ignored.
+                  </p>
+                )}
+              </>
+            )}
+          </Card>
+        );
+      })()}
 
       {(modules ?? []).length === 0 && <Empty title={t.emptyModules}>{t.emptyModulesBody}</Empty>}
 
@@ -237,10 +288,297 @@ async function Modules({ db, t }: { db: DB; t: { save: string; add: string; del:
 
           <form action={deleteModule} className="mt-4">
             <input type="hidden" name="id" value={m.id} />
-            <button className="text-xs text-red-700 underline">{t.del}</button>
+            <SubmitLink>{t.del}</SubmitLink>
           </form>
         </Card>
       ))}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------- STL task review */
+async function Tasks({
+  db, locale, submissionId, isReviewer
+}: {
+  db: DB;
+  locale: string;
+  submissionId?: string;
+  isReviewer: boolean;
+}) {
+  const ar = locale === 'ar';
+  const labels = ar ? {
+    title: 'مهام الطلاب STL', setup: 'إعداد المهام', newTask: 'مهمة جديدة', lesson: 'الدرس',
+    titleAr: 'العنوان بالعربي', titleEn: 'العنوان بالإنجليزي', descAr: 'الوصف بالعربي', descEn: 'الوصف بالإنجليزي',
+    maxScore: 'الدرجة النهائية', types: 'أنواع الملفات', maxSize: 'أقصى حجم MB', due: 'الموعد النهائي',
+    active: 'مفعلة', resubmit: 'السماح بإعادة التسليم', save: 'حفظ المهمة', remove: 'حذف / تعطيل',
+    queue: 'طابور التسليمات', emptyQueue: 'لا توجد تسليمات STL بعد.', student: 'الطالب', stage: 'المرحلة',
+    submitted: 'تم التسليم', underReview: 'قيد المراجعة', graded: 'تم التقييم', revision: 'يحتاج تعديل',
+    file: 'الملف', openDrive: 'فتح / تنزيل STL', openHint: 'الملف خاص؛ افتحه بحساب Google الذي يملك/يشارك مجلد OrlaDent Camp.',
+    grade: 'الدرجة', feedback: 'ملاحظات المدرب', status: 'الحالة', saveEvaluation: 'حفظ التقييم', attempt: 'المحاولة',
+    driveOff: 'Google Drive غير مهيأ بعد. أضف رابط Apps Script والـ Secret في Vercel قبل استقبال ملفات حقيقية.',
+    noAssignments: 'لا توجد مهام. أنشئ أول مهمة واربطها بدرس معين.', size: 'الحجم', date: 'التاريخ',
+    stuckTitle: 'رفع لم يكتمل',
+    stuckBody: 'الطالب بدأ الرفع ولم يصل الملف كاملاً إلى Drive. لا يمكن تقييم هذه المحاولات — اطلب من الطالب إعادة الرفع.',
+    stuckStatus: { uploading: 'جاري الرفع', failed: 'فشل الرفع' }
+  } : {
+    title: 'Student STL Tasks', setup: 'Task setup', newTask: 'New task', lesson: 'Lesson',
+    titleAr: 'Arabic title', titleEn: 'English title', descAr: 'Arabic description', descEn: 'English description',
+    maxScore: 'Max score', types: 'File types', maxSize: 'Max size MB', due: 'Due date',
+    active: 'Active', resubmit: 'Allow resubmission', save: 'Save task', remove: 'Delete / disable',
+    queue: 'Submission queue', emptyQueue: 'No STL submissions yet.', student: 'Student', stage: 'Stage',
+    submitted: 'Submitted', underReview: 'Under review', graded: 'Graded', revision: 'Needs revision',
+    file: 'File', openDrive: 'Open / Download STL', openHint: 'The file is private; open it with a Google account that owns or can access the OrlaDent Camp folder.',
+    grade: 'Grade', feedback: 'Instructor feedback', status: 'Status', saveEvaluation: 'Save evaluation', attempt: 'Attempt',
+    driveOff: 'Google Drive is not configured yet. Add the Apps Script URL and secret in Vercel before accepting real files.',
+    noAssignments: 'No tasks yet. Create the first task and attach it to a lesson.', size: 'Size', date: 'Date',
+    stuckTitle: 'Incomplete upload',
+    stuckBody: 'The student started an upload but the file never reached Drive in full. These attempts cannot be graded — ask the student to upload again.',
+    stuckStatus: { uploading: 'Uploading', failed: 'Upload failed' }
+  };
+
+  const [{ data: modules }, { data: assignments }, { data: submissions }, { data: profiles }] = await Promise.all([
+    db.from('course_modules').select('id,title_ar,title_en,block,order_index').order('order_index'),
+    db.from('assignments').select('*').order('created_at', { ascending: true }),
+    /*
+     * Fetch EVERY status, including uploading/failed.
+     *
+     * These two were filtered out in the query, which meant a submission that
+     * never finalised was invisible here — the admin saw "No STL submissions
+     * yet" while the student was looking at their own upload and the row sat
+     * in the database. They are split out below into a warning strip instead
+     * of being hidden: a stuck upload is exactly the thing an instructor needs
+     * to know about, not the thing to conceal.
+     */
+    db.from('assignment_submissions').select('*').order('updated_at', { ascending: false }).limit(500),
+    db.from('profiles').select('id,email,full_name')
+  ]);
+
+  const moduleById = new Map((modules ?? []).map((m: any) => [m.id, m]));
+  const assignmentById = new Map((assignments ?? []).map((a: any) => [a.id, a]));
+  const profileById = new Map((profiles ?? []).map((profile: any) => [profile.id, profile]));
+  const allRows = submissions ?? [];
+  // Gradeable submissions vs uploads that never arrived. Both are real rows;
+  // only the first group can be reviewed, only the second explains a task that
+  // refuses to delete.
+  const rows = allRows.filter((row: any) => !['uploading', 'failed'].includes(row.status));
+  const stuck = allRows.filter((row: any) => ['uploading', 'failed'].includes(row.status));
+  const pending = rows.filter((row: any) => ['submitted', 'resubmitted', 'under_review'].includes(row.status));
+  const selected = rows.find((row: any) => row.id === submissionId) ?? pending[pending.length - 1] ?? rows[0] ?? null;
+  const selectedAssignment = selected ? assignmentById.get(selected.assignment_id) : null;
+  const selectedModule = selectedAssignment ? moduleById.get(selectedAssignment.lesson_id) : null;
+  const selectedProfile = selected ? profileById.get(selected.user_id) : null;
+
+  const stageText = (block: string | null | undefined) => {
+    if (block === 'foundations') return ar ? 'المرحلة 1' : 'Stage 1';
+    if (block === 'restorative') return ar ? 'المرحلة 2' : 'Stage 2';
+    if (block === 'advanced') return ar ? 'المرحلة 3' : 'Stage 3';
+    return block || '—';
+  };
+  const statusText = (status: string) => status === 'graded'
+    ? labels.graded
+    : status === 'needs_revision'
+      ? labels.revision
+      : status === 'under_review'
+        ? labels.underReview
+        : labels.submitted;
+  const statusTone = (status: string): 'ok' | 'warn' | 'bad' | 'mute' => status === 'graded'
+    ? 'ok'
+    : status === 'needs_revision'
+      ? 'bad'
+      : status === 'under_review'
+        ? 'warn'
+        : 'mute';
+  const formatSize = (bytes: number) => `${Math.max(0, Number(bytes || 0) / 1024 / 1024).toFixed(Number(bytes || 0) < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+  const localDateTime = (value: string | null) => value
+    ? new Intl.DateTimeFormat(ar ? 'ar-EG-u-nu-latn' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Cairo' }).format(new Date(value))
+    : '—';
+  const inputDate = (value: string | null) => value ? new Date(value).toISOString().slice(0, 16) : '';
+
+  const assignmentForm = (assignment?: any) => (
+    <form action={saveAssignment} className="grid gap-3 sm:grid-cols-2">
+      {assignment && <input type="hidden" name="id" value={assignment.id} />}
+      <Field label={labels.lesson}>
+        <select name="lesson_id" defaultValue={assignment?.lesson_id ?? ''} className="field" required>
+          <option value="" disabled>—</option>
+          {(modules ?? []).map((module: any) => (
+            <option key={module.id} value={module.id}>
+              {String(module.order_index).padStart(2, '0')} — {ar ? module.title_ar : module.title_en}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label={labels.maxScore}><input name="max_score" type="number" min="1" step="0.5" defaultValue={assignment?.max_score ?? 100} className="field" required /></Field>
+      <Field label={labels.titleAr}><input name="title_ar" defaultValue={assignment?.title_ar ?? ''} className="field" required /></Field>
+      <Field label={labels.titleEn}><input name="title_en" defaultValue={assignment?.title_en ?? ''} className="field" required /></Field>
+      <Field label={labels.descAr}><textarea name="description_ar" rows={2} defaultValue={assignment?.description_ar ?? ''} className="field" /></Field>
+      <Field label={labels.descEn}><textarea name="description_en" rows={2} defaultValue={assignment?.description_en ?? ''} className="field" /></Field>
+      <Field label={labels.types} hint=".stl, .ply"><input name="allowed_file_types" defaultValue={(assignment?.allowed_file_types ?? ['.stl']).join(', ')} className="field" /></Field>
+      <Field label={labels.maxSize} hint={ar ? 'اتركه فارغًا لاستخدام حد النظام.' : 'Leave blank to use the system limit.'}><input name="max_file_size_mb" type="number" min="1" defaultValue={assignment?.max_file_size_mb ?? ''} className="field" /></Field>
+      <Field label={labels.due}><input name="due_date" type="datetime-local" defaultValue={inputDate(assignment?.due_date ?? null)} className="field" /></Field>
+      <div className="flex flex-wrap items-end gap-5 pb-2 text-sm">
+        <label className="flex items-center gap-2"><input type="checkbox" name="active" defaultChecked={assignment?.active ?? true} className="h-4 w-4" />{labels.active}</label>
+        <label className="flex items-center gap-2"><input type="checkbox" name="allow_resubmission" defaultChecked={assignment?.allow_resubmission ?? true} className="h-4 w-4" />{labels.resubmit}</label>
+      </div>
+      <SubmitButton className="btn-primary sm:col-span-2" ar={ar}>{labels.save}</SubmitButton>
+    </form>
+  );
+
+  return (
+    <div className="space-y-6">
+      {!isGoogleDriveConfigured() && (
+        <div className="border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">{labels.driveOff}</div>
+      )}
+
+      {!isReviewer && (
+        <details className="border border-line bg-white" open={(assignments ?? []).length === 0}>
+          <summary className="cursor-pointer px-5 py-4 font-display text-base font-bold">{labels.setup}</summary>
+          <div className="border-t border-line p-5 sm:p-7">
+            <h2 className="mb-5 font-display text-lg font-bold">{labels.newTask}</h2>
+            {assignmentForm()}
+            {(assignments ?? []).length === 0 ? (
+              <p className="mt-5 text-sm text-steel">{labels.noAssignments}</p>
+            ) : (
+              <div className="mt-7 space-y-4 border-t border-line pt-7">
+                {(assignments ?? []).map((assignment: any) => {
+                  const module = moduleById.get(assignment.lesson_id);
+                  return (
+                    <details key={assignment.id} className="rounded-xl border border-ink/10 bg-paper/40">
+                      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">
+                        {assignment.active ? '● ' : '○ '}{ar ? assignment.title_ar : assignment.title_en}
+                        {module ? ` · ${ar ? module.title_ar : module.title_en}` : ''}
+                      </summary>
+                      <div className="border-t border-line bg-white p-4">
+                        {assignmentForm(assignment)}
+                        <form action={deleteAssignment} className="mt-3">
+                          <input type="hidden" name="id" value={assignment.id} />
+                          <SubmitLink ar={ar}>{labels.remove}</SubmitLink>
+                        </form>
+                      </div>
+                    </details>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
+      {stuck.length > 0 && (
+        <div className="border border-amber-300 bg-amber-50 px-5 py-4">
+          <p className="font-display text-sm font-bold text-amber-900">
+            {labels.stuckTitle} <span className="figure">({stuck.length})</span>
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-amber-900/80">{labels.stuckBody}</p>
+          <ul className="mt-3 space-y-1.5">
+            {stuck.map((row: any) => {
+              const profile = profileById.get(row.user_id);
+              const assignment = assignmentById.get(row.assignment_id);
+              return (
+                <li key={row.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-900">
+                  <span className="font-semibold">{profile?.full_name || profile?.email || row.user_id}</span>
+                  <span className="opacity-60">·</span>
+                  <span>{assignment ? (ar ? assignment.title_ar : assignment.title_en) : '—'}</span>
+                  <span className="opacity-60">·</span>
+                  <span className="truncate">{row.original_filename}</span>
+                  <span className="opacity-60">·</span>
+                  <span className="figure">{formatSize(row.file_size)}</span>
+                  <span className="opacity-60">·</span>
+                  <span className="font-semibold">
+                    {(labels.stuckStatus as Record<string, string>)[row.status] ?? row.status}
+                  </span>
+                  <span className="opacity-60">·</span>
+                  <span className="figure opacity-70">{localDateTime(row.updated_at)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      <div>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="font-display text-lg font-black">{labels.queue}</h2>
+          <span className="figure text-sm text-brass">{pending.length}</span>
+        </div>
+        {rows.length === 0 ? (
+          <Empty title={labels.queue}>{labels.emptyQueue}</Empty>
+        ) : (
+          <div className="grid gap-px border border-line bg-line lg:grid-cols-[21rem_1fr]">
+            <div className="bg-white">
+              <ul className="max-h-[42rem] overflow-y-auto">
+                {rows.map((row: any) => {
+                  const profile = profileById.get(row.user_id);
+                  const assignment = assignmentById.get(row.assignment_id);
+                  const module = assignment ? moduleById.get(assignment.lesson_id) : null;
+                  const on = row.id === selected?.id;
+                  return (
+                    <li key={row.id}>
+                      <Link href={`${lh(locale, '/admin')}?tab=tasks&submission=${row.id}`} className={`block border-b border-line px-5 py-4 transition ${on ? 'border-s-2 border-s-brass bg-paper' : 'hover:bg-paper'}`}>
+                        <p className="truncate text-sm font-semibold text-ink">{profile?.full_name || profile?.email || row.user_id}</p>
+                        <p className="mt-1 truncate text-xs text-steel">{assignment ? (ar ? assignment.title_ar : assignment.title_en) : 'Task'}{module ? ` · ${stageText(module.block)} · ${ar ? module.title_ar : module.title_en}` : ''}</p>
+                        <p className="mt-2.5 flex items-center justify-between gap-2"><Pill tone={statusTone(row.status)}>{statusText(row.status)}</Pill><span className="figure text-[0.68rem] text-steel">#{row.attempt_number}</span></p>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            <div className="bg-white p-5 sm:p-7">
+              {selected && selectedAssignment ? (
+                <>
+                  <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-5">
+                    <div>
+                      <h3 className="font-display text-lg font-black">{selectedProfile?.full_name || selectedProfile?.email || selected.user_id}</h3>
+                      <p className="mt-1 text-sm text-steel">{selectedProfile?.email}</p>
+                      <p className="mt-3 text-sm font-semibold">{ar ? selectedAssignment.title_ar : selectedAssignment.title_en}</p>
+                      <p className="mt-1 text-xs text-steel">{selectedModule ? `${labels.stage}: ${stageText(selectedModule.block)} · ${labels.lesson}: ${ar ? selectedModule.title_ar : selectedModule.title_en}` : ''}</p>
+                    </div>
+                    <Pill tone={statusTone(selected.status)}>{statusText(selected.status)}</Pill>
+                  </div>
+
+                  <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl bg-paper p-3"><p className="label !mb-1">{labels.file}</p><p className="truncate text-sm font-semibold">{selected.original_filename}</p></div>
+                    <div className="rounded-xl bg-paper p-3"><p className="label !mb-1">{labels.size}</p><p className="figure text-sm">{formatSize(selected.file_size)}</p></div>
+                    <div className="rounded-xl bg-paper p-3"><p className="label !mb-1">{labels.attempt}</p><p className="figure text-sm">#{selected.attempt_number}</p></div>
+                  </div>
+                  <p className="mt-3 text-xs text-steel">{labels.date}: {localDateTime(selected.submitted_at || selected.updated_at)}</p>
+
+                  <div className="mt-5 rounded-xl border border-dashed border-line bg-paper px-5 py-6 text-center">
+                    {selected.drive_web_view_link ? (
+                      <a href={selected.drive_web_view_link} target="_blank" rel="noopener noreferrer" className="btn-brass">{labels.openDrive}</a>
+                    ) : (
+                      <p className="text-sm text-steel">Drive file link unavailable</p>
+                    )}
+                    <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-steel">{labels.openHint}</p>
+                    {selected.drive_file_id && <code className="mt-3 block break-all text-[0.65rem] text-steel">{selected.drive_file_id}</code>}
+                  </div>
+
+                  <form action={reviewAssignmentSubmission} className="mt-6 grid gap-4 sm:grid-cols-2">
+                    <input type="hidden" name="id" value={selected.id} />
+                    <Field label={labels.status}>
+                      <select name="status" defaultValue={selected.status === 'graded' || selected.status === 'needs_revision' || selected.status === 'under_review' ? selected.status : 'under_review'} className="field">
+                        <option value="under_review">{labels.underReview}</option>
+                        <option value="graded">{labels.graded}</option>
+                        <option value="needs_revision">{labels.revision}</option>
+                      </select>
+                    </Field>
+                    <Field label={`${labels.grade} / ${selectedAssignment.max_score}`}>
+                      <input name="grade" type="number" min="0" max={Number(selectedAssignment.max_score)} step="0.5" defaultValue={selected.grade ?? ''} className="field" />
+                    </Field>
+                    <div className="sm:col-span-2">
+                      <Field label={labels.feedback}><textarea name="admin_feedback" rows={7} defaultValue={selected.admin_feedback ?? ''} className="field" /></Field>
+                    </div>
+                    <SubmitButton className="btn-primary sm:col-span-2" ar={ar}>{labels.saveEvaluation}</SubmitButton>
+                  </form>
+                </>
+              ) : (
+                <Empty title={labels.queue}>{labels.emptyQueue}</Empty>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -277,7 +615,7 @@ async function QC({ db, save, locale, caseId, t }: { db: DB; save: string; local
             const on = row.id === selected?.id;
             return (
               <li key={row.id}>
-                <a
+                <Link
                   href={`${lh(locale, '/admin')}?tab=qc&case=${row.id}`}
                   aria-current={on ? 'true' : undefined}
                   className={`block border-b border-line px-5 py-4 transition ${
@@ -294,7 +632,7 @@ async function QC({ db, save, locale, caseId, t }: { db: DB; save: string; local
                       {new Date(row.submitted_at).toLocaleDateString('en-GB')}
                     </span>
                   </p>
-                </a>
+                </Link>
               </li>
             );
           })}
@@ -338,7 +676,7 @@ async function QC({ db, save, locale, caseId, t }: { db: DB; save: string; local
                   placeholder={t('feedbackPlaceholder')}
                 />
               </Field>
-              <button className="btn-primary">{save}</button>
+              <SubmitButton>{save}</SubmitButton>
             </form>
 
             {selected.reviewed_by && (
@@ -383,7 +721,7 @@ async function Requests({ db, save }: { db: DB; save: string }) {
               </select>
             </Field>
             <Field label="Notes"><input name="admin_notes" defaultValue={r.admin_notes ?? ''} className="field" /></Field>
-            <button className="btn-quiet sm:col-span-4">{save}</button>
+            <SubmitButton className="btn-quiet sm:col-span-4">{save}</SubmitButton>
           </form>
 
           {r.status === 'approved' && r.user_id && (
@@ -392,7 +730,7 @@ async function Requests({ db, save }: { db: DB; save: string }) {
               <input type="hidden" name="user_id" value={r.user_id} />
               <input type="hidden" name="agreed_price" value={r.agreed_price ?? ''} />
               <input type="hidden" name="agreed_currency" value={r.agreed_currency ?? 'EGP'} />
-              <button className="btn-brass text-sm">Grant access manually</button>
+              <SubmitButton className="btn-brass text-sm" pendingLabel="Granting access…">Grant access manually</SubmitButton>
               <span className="text-xs text-steel">Takes one of the 3 seats.</span>
             </form>
           )}
@@ -418,7 +756,7 @@ async function Sessions({ db, t }: { db: DB; t: { save: string; add: string; del
       <Field label="Minimum plan order"><input name="min_tier_order" type="number" defaultValue={s?.min_tier_order ?? 2} className="field" /></Field>
       <Field label="Join link"><input name="join_link" defaultValue={s?.join_link ?? ''} className="field" /></Field>
       <Field label="Recording link"><input name="recording_link" defaultValue={s?.recording_link ?? ''} className="field" /></Field>
-      <button className="btn-primary sm:col-span-2">{s ? t.save : t.add}</button>
+      <SubmitButton className="btn-primary sm:col-span-2">{s ? t.save : t.add}</SubmitButton>
     </form>
   );
 
@@ -430,7 +768,7 @@ async function Sessions({ db, t }: { db: DB; t: { save: string; add: string; del
           {form(s)}
           <form action={deleteSession} className="mt-3">
             <input type="hidden" name="id" value={s.id} />
-            <button className="text-xs text-red-700 underline">{t.del}</button>
+            <SubmitLink>{t.del}</SubmitLink>
           </form>
         </Card>
       ))}
@@ -446,7 +784,7 @@ async function Community({ db, save }: { db: DB; save: string }) {
       <form action={saveCommunity} className="max-w-lg space-y-4">
         <Field label="WhatsApp group link"><input name="whatsapp_group_link" defaultValue={data?.whatsapp_group_link ?? ''} className="field" /></Field>
         <Field label="Minimum plan order"><input name="min_tier_order" type="number" defaultValue={data?.min_tier_order ?? 2} className="field" /></Field>
-        <button className="btn-primary">{save}</button>
+        <SubmitButton>{save}</SubmitButton>
       </form>
     </Card>
   );
@@ -489,7 +827,7 @@ async function Promos({ db, t }: { db: DB; t: { save: string; add: string; del: 
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" name="is_active" defaultChecked={p ? p.is_active : true} className="h-4 w-4" /> Active
       </label>
-      <button className="btn-primary sm:col-span-2">{p ? t.save : t.add}</button>
+      <SubmitButton className="btn-primary sm:col-span-2">{p ? t.save : t.add}</SubmitButton>
     </form>
   );
 
@@ -502,7 +840,7 @@ async function Promos({ db, t }: { db: DB; t: { save: string; add: string; del: 
           {form(p)}
           <form action={deletePromo} className="mt-3">
             <input type="hidden" name="id" value={p.id} />
-            <button className="text-xs text-red-700 underline">{t.del}</button>
+            <SubmitLink>{t.del}</SubmitLink>
           </form>
         </Card>
       ))}
@@ -558,7 +896,7 @@ async function Settings({ db, save }: { db: DB; save: string }) {
         </div>
       </Card>
 
-      <button className="btn-primary">{save}</button>
+      <SubmitButton>{save}</SubmitButton>
     </form>
   );
 }
@@ -654,10 +992,10 @@ async function Students({
 
     return (
       <div className="space-y-8">
-        <a href={`${lh(locale, '/admin')}?tab=students`} className="text-sm text-brass underline">← {t('backToList')}</a>
+        <Link href={`${lh(locale, '/admin')}?tab=students`} className="text-sm text-brass underline">← {t('backToList')}</Link>
 
         <Card>
-          <h2 className="font-display text-2xl font-black">{student.full_name || student.email}</h2>
+          <h2 className="font-display text-xl font-black">{student.full_name || student.email}</h2>
           <p className="mt-1 text-sm text-steel">{student.email}</p>
 
           {student.installments_total > 0 && (
@@ -697,7 +1035,7 @@ async function Students({
               {t('hasAccess')}
             </label>
             <Field label={t('notes')}><textarea name="admin_notes" rows={3} defaultValue={student.admin_notes ?? ''} className="field" /></Field>
-            <div className="flex items-end"><button className="btn-primary w-full">{save}</button></div>
+            <div className="flex items-end"><SubmitButton className="btn-primary w-full">{save}</SubmitButton></div>
           </form>
         </Card>
 
@@ -721,7 +1059,7 @@ async function Students({
               <input type="checkbox" name="grant_access" defaultChecked className="h-4 w-4" />
               {t('grantOnRecord')}
             </label>
-            <div className="sm:col-span-2"><button className="btn-brass w-full">{t('add')}</button></div>
+            <div className="sm:col-span-2"><SubmitButton className="btn-brass w-full">{t('add')}</SubmitButton></div>
           </form>
         </Card>
 
@@ -789,9 +1127,9 @@ async function Students({
           {(students ?? []).map((u) => (
             <tr key={u.id} className="border-b border-line last:border-0 hover:bg-paper">
               <td className="p-4">
-                <a href={`${lh(locale, '/admin')}?tab=students&student=${u.id}`} className="font-medium text-brass underline">
+                <Link href={`${lh(locale, '/admin')}?tab=students&student=${u.id}`} className="font-medium text-brass underline">
                   {u.full_name || u.email}
-                </a>
+                </Link>
                 <span className="block text-xs text-steel">{u.email}</span>
               </td>
               <td className="p-4">{(u.tiers as any)?.name_en ?? '—'}</td>
@@ -833,9 +1171,9 @@ async function Payments({ db, locale, t }: { db: DB; locale: string; t: any }) {
           {(rows ?? []).map((x) => (
             <tr key={x.id} className="border-b border-line last:border-0 hover:bg-paper">
               <td className="p-4">
-                <a href={`${lh(locale, '/admin')}?tab=students&student=${x.user_id}`} className="text-brass underline">
+                <Link href={`${lh(locale, '/admin')}?tab=students&student=${x.user_id}`} className="text-brass underline">
                   {(x.profiles as any)?.full_name || (x.profiles as any)?.email || '—'}
-                </a>
+                </Link>
               </td>
               <td className="p-4">{(x.tiers as any)?.name_en ?? '—'}</td>
               <td className="figure p-4 text-ink">{Number(x.amount).toLocaleString('en-US')} {x.currency}</td>
@@ -849,5 +1187,119 @@ async function Payments({ db, locale, t }: { db: DB; locale: string; t: any }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+
+/* ================= LEADS ================= */
+/**
+ * Everyone who asked for the free lesson.
+ *
+ * The lead magnet was collecting these into the `leads` table and nothing in
+ * the product ever showed them — the only way to read your own list was to
+ * open the Supabase SQL editor. A list you cannot see is a list you will not
+ * use, which defeats the point of gating the lesson at all.
+ *
+ * Read here with the service-role client. `leads` has RLS on and no public
+ * policy, so this data can only ever be reached from the server.
+ */
+async function Leads({ db, locale }: { db: DB; locale: string }) {
+  const ar = locale === 'ar';
+
+  const { data: leads } = await db
+    .from('leads')
+    .select('id,email,full_name,region,source,utm_source,utm_campaign,created_at')
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  const rows = leads ?? [];
+
+  // Which of these later became paying students — the number that tells you
+  // whether the free lesson is doing its job.
+  const { data: paidProfiles } = await db.from('profiles').select('email').eq('has_access', true);
+  const paidEmails = new Set((paidProfiles ?? []).map((p: any) => String(p.email).toLowerCase()));
+  const converted = rows.filter((r: any) => paidEmails.has(String(r.email).toLowerCase())).length;
+
+  const since = (days: number) => {
+    const cut = Date.now() - days * 86400000;
+    return rows.filter((r: any) => new Date(r.created_at).getTime() >= cut).length;
+  };
+
+  const fmt = (iso: string) =>
+    new Intl.DateTimeFormat(ar ? 'ar-EG-u-nu-latn' : 'en-GB', {
+      dateStyle: 'medium', timeStyle: 'short', timeZone: 'Africa/Cairo'
+    }).format(new Date(iso));
+
+  return (
+    <>
+      <div className="mb-6 grid grid-cols-1 gap-3 xs:grid-cols-2 lg:grid-cols-4">
+        <Stat label={ar ? 'الإجمالي' : 'Total'} value={String(rows.length)} />
+        <Stat label={ar ? 'آخر 7 أيام' : 'Last 7 days'} value={String(since(7))} />
+        <Stat label={ar ? 'آخر 30 يوم' : 'Last 30 days'} value={String(since(30))} />
+        <Stat
+          label={ar ? 'تحوّلوا إلى مشتركين' : 'Became students'}
+          value={rows.length ? `${converted} (${Math.round((converted / rows.length) * 100)}%)` : '0'}
+        />
+      </div>
+
+      {rows.length === 0 ? (
+        <Empty title={ar ? 'لا توجد تسجيلات بعد' : 'No leads yet'}>
+          {ar
+            ? 'سيظهر هنا كل من يُدخل بريده في صفحة الدرس المجاني.'
+            : 'Anyone who enters their email on the free lesson page shows up here.'}
+        </Empty>
+      ) : (
+        <Card>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="label">{ar ? 'جميع المسجّلين' : 'Everyone who signed up'}</p>
+            {/*
+              A plain mailto with every address in BCC — no export step, no
+              spreadsheet, no third-party tool. BCC and not To: putting a
+              customer list in a visible To: field leaks every address to
+              every recipient.
+            */}
+            <a
+              href={`mailto:?bcc=${rows.map((r: any) => r.email).join(',')}&subject=${encodeURIComponent('OrlaDent Camp')}`}
+              className="btn-quiet text-xs"
+            >
+              {ar ? 'مراسلة الجميع (نسخة مخفية)' : 'Email all (BCC)'}
+            </a>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[40rem] text-sm">
+              <thead>
+                <tr className="border-b border-ink/20 text-start">
+                  <th className="py-3 pe-4 text-start">{ar ? 'الإيميل' : 'Email'}</th>
+                  <th className="py-3 pe-4 text-start">{ar ? 'الاسم' : 'Name'}</th>
+                  <th className="py-3 pe-4 text-start">{ar ? 'المصدر' : 'Source'}</th>
+                  <th className="py-3 pe-4 text-start">{ar ? 'التاريخ' : 'Date'}</th>
+                  <th className="py-3 pe-4 text-start">{ar ? 'مشترك؟' : 'Student?'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r: any) => (
+                  <tr key={r.id} className="border-b border-line">
+                    <td className="py-3 pe-4">
+                      <a href={`mailto:${r.email}`} className="text-brass underline">{r.email}</a>
+                    </td>
+                    <td className="py-3 pe-4">{r.full_name || '—'}</td>
+                    <td className="py-3 pe-4 text-xs text-steel">
+                      {r.utm_campaign || r.utm_source || r.source || '—'}
+                    </td>
+                    <td className="py-3 pe-4 text-xs text-steel">{fmt(r.created_at)}</td>
+                    <td className="py-3 pe-4">
+                      {paidEmails.has(String(r.email).toLowerCase())
+                        ? <Pill tone="ok">{ar ? 'نعم' : 'yes'}</Pill>
+                        : <Pill tone="mute">—</Pill>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+    </>
   );
 }

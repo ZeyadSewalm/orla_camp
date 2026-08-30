@@ -1,10 +1,21 @@
 import createIntlMiddleware from 'next-intl/middleware';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { locales, defaultLocale } from './i18n';
+import { locales, defaultLocale, LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from './i18n';
 import { lh } from './lib/href';
+import { rethrowIfControlFlow } from './lib/next-errors';
 
-const intlMiddleware = createIntlMiddleware({ locales: [...locales], defaultLocale, localePrefix: 'as-needed' });
+const intlMiddleware = createIntlMiddleware({
+  locales: [...locales],
+  defaultLocale,
+  localePrefix: 'as-needed',
+  // Detection stays ON — it is what makes an unprefixed "/pricing" mean Arabic
+  // for an Arabic visitor and English for someone who switched. The cookie is
+  // named explicitly here so LocaleSwitcher and the middleware can never drift
+  // apart; both import it from i18n.ts.
+  localeDetection: true,
+  localeCookie: { name: LOCALE_COOKIE, maxAge: LOCALE_COOKIE_MAX_AGE, sameSite: 'lax' }
+});
 
 const PROTECTED = ['/course', '/admin', '/community', '/live-sessions', '/checkout'];
 
@@ -63,6 +74,20 @@ export async function middleware(request: NextRequest) {
 
   const response = intlMiddleware(request);
 
+  /**
+   * If next-intl decided this url has to move (e.g. "/en/pricing" → "/pricing"
+   * after a language switch), send that redirect NOW.
+   *
+   * Doing the Supabase work on a response that is already a 307 wastes a round
+   * trip, and worse, any auth cookie written onto a redirect can be lost. The
+   * browser follows the redirect and this middleware runs again on the real
+   * url, where the auth check happens properly.
+   */
+  if (response.status >= 300 && response.status < 400) {
+    log('intl redirect');
+    return response;
+  }
+
   const pathname = request.nextUrl.pathname;
   const locale = locales.find((l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`)) ?? defaultLocale;
   const bare = pathname.replace(/^\/(ar|en)(?=\/|$)/, '') || '/';
@@ -101,10 +126,31 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  /**
+   * EVERYTHING BELOW IS WRAPPED.
+   *
+   * The middleware runs on every single request, so anything it throws is a
+   * 500 on EVERY page - including the landing page, /pricing and /faq, none of
+   * which need to know who you are. A missing env var on a deploy, an expired
+   * key, or Supabase simply being unreachable used to take the whole site
+   * down. Confirmed against the production build with the credentials removed:
+   * every route returned "500: Internal Server Error".
+   *
+   * The failure policy is deliberately asymmetric:
+   *   - public route    -> serve the page. Not knowing who you are costs
+   *                        nothing there.
+   *   - protected route -> send to login. Fail CLOSED; never hand out /admin
+   *                        or /course because an auth check happened to error.
+   */
+  let user: { id: string } | null = null;
+  let profile: { has_access: boolean | null; role: string | null } | null = null;
+
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) throw new Error('Supabase env vars are missing');
+
+    const supabase = createServerClient(url, key, {
       cookies: {
         get: (name: string) => request.cookies.get(name)?.value,
         set: (name: string, value: string, options: CookieOptions) => {
@@ -116,10 +162,32 @@ export async function middleware(request: NextRequest) {
           response.cookies.set({ name, value: '', ...options });
         }
       }
-    }
-  );
+    });
 
-  const { data: { user } } = await supabase.auth.getUser();
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+
+    if (isProtected && user) {
+      const { data: row } = await supabase
+        .from('profiles')
+        .select('has_access, role')
+        .eq('id', user.id)
+        .single();
+      profile = row;
+    }
+  } catch (error) {
+    rethrowIfControlFlow(error);
+    console.error('[mw] auth check failed:', error);
+
+    if (!isProtected) {
+      log('public (auth check failed - serving page anyway)');
+      return response;
+    }
+
+    return NextResponse.redirect(
+      new URL(`${lh(locale, '/login')}?next=${encodeURIComponent(pathname)}`, request.url)
+    );
+  }
 
   // Public route: the refresh was the only reason we were here.
   if (!isProtected) {
@@ -132,12 +200,6 @@ export async function middleware(request: NextRequest) {
       new URL(`${lh(locale, '/login')}?next=${encodeURIComponent(pathname)}`, request.url)
     );
   }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('has_access, role')
-    .eq('id', user.id)
-    .single();
 
   log('auth + profile');
 

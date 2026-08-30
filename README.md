@@ -122,3 +122,16 @@ middleware.ts            locale routing + route protection
 ```
 
 Dynamic copy (plans, modules, landing) is bilingual in the database via `_ar` / `_en` columns, and every admin form edits both languages side by side.
+
+## 9. Student STL tasks — Google Drive via Apps Script
+
+STL/PLY binaries are not stored in Supabase Storage. The signed-in student is
+identified by Supabase Auth, while assignment/submission/grade/feedback metadata
+stays in Supabase. A Google Apps Script web app owned by the dedicated Drive
+account creates and verifies Google Drive resumable upload sessions, so the
+large file travels from the student's browser directly to Google Drive instead
+of through Vercel.
+
+No Google Cloud OAuth Client ID/Secret is required by this version. Follow
+`GOOGLE-DRIVE-STL-SETUP.md` and paste `google-apps-script/Code.gs` into
+script.google.com.

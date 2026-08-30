@@ -140,6 +140,21 @@ create table if not exists site_settings (
   landing_image_url text
 );
 
+-- ---------- 11. STUDENT LESSON PROGRESS ----------
+create table if not exists lesson_progress (
+  user_id uuid references profiles(id) on delete cascade not null,
+  module_id uuid references course_modules(id) on delete cascade not null,
+  is_completed boolean not null default false,
+  watch_seconds integer not null default 0 check (watch_seconds >= 0),
+  started_at timestamptz not null default now(),
+  last_watched_at timestamptz not null default now(),
+  completed_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, module_id)
+);
+create index if not exists lesson_progress_user_recent_idx
+  on lesson_progress (user_id, last_watched_at desc);
+
 -- =============================================================
 -- HELPERS
 -- =============================================================
@@ -165,6 +180,58 @@ as $$
     (select t.order_index from profiles p join tiers t on t.id = p.tier_id
       where p.id = auth.uid() and p.has_access = true), 0);
 $$;
+
+-- Atomic progress helpers used by the student course page.
+create or replace function public.record_lesson_watch(p_module_id uuid, p_seconds integer default 0)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  safe_seconds integer := greatest(0, least(coalesce(p_seconds, 0), 120));
+begin
+  if auth.uid() is null then raise exception 'not authenticated'; end if;
+  if not exists (select 1 from profiles p where p.id = auth.uid()
+                 and (coalesce(p.has_access, false) or p.role in ('admin','reviewer'))) then
+    raise exception 'course access required';
+  end if;
+  insert into lesson_progress (user_id, module_id, watch_seconds, started_at, last_watched_at, updated_at)
+  values (auth.uid(), p_module_id, safe_seconds, now(), now(), now())
+  on conflict (user_id, module_id) do update
+    set watch_seconds = lesson_progress.watch_seconds + safe_seconds,
+        last_watched_at = now(), updated_at = now();
+end;
+$$;
+
+create or replace function public.set_lesson_complete(p_module_id uuid, p_completed boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then raise exception 'not authenticated'; end if;
+  if not exists (select 1 from profiles p where p.id = auth.uid()
+                 and (coalesce(p.has_access, false) or p.role in ('admin','reviewer'))) then
+    raise exception 'course access required';
+  end if;
+  insert into lesson_progress (user_id, module_id, is_completed, completed_at, started_at, last_watched_at, updated_at)
+  values (auth.uid(), p_module_id, coalesce(p_completed, false),
+          case when coalesce(p_completed, false) then now() else null end, now(), now(), now())
+  on conflict (user_id, module_id) do update
+    set is_completed = excluded.is_completed,
+        completed_at = case when excluded.is_completed then coalesce(lesson_progress.completed_at, now()) else null end,
+        last_watched_at = now(), updated_at = now();
+end;
+$$;
+
+revoke all on function public.record_lesson_watch(uuid, integer) from public;
+revoke execute on function public.record_lesson_watch(uuid, integer) from anon;
+grant execute on function public.record_lesson_watch(uuid, integer) to authenticated;
+revoke all on function public.set_lesson_complete(uuid, boolean) from public;
+revoke execute on function public.set_lesson_complete(uuid, boolean) from anon;
+grant execute on function public.set_lesson_complete(uuid, boolean) to authenticated;
 
 -- Create a profile row automatically for every new auth user.
 create or replace function public.handle_new_user()
@@ -205,6 +272,7 @@ alter table live_sessions               enable row level security;
 alter table community_settings          enable row level security;
 alter table production_partner_requests enable row level security;
 alter table site_settings               enable row level security;
+alter table lesson_progress             enable row level security;
 
 -- tiers: public read, admin write
 create policy "tiers public read"  on tiers for select using (true);
@@ -250,6 +318,16 @@ create policy "ppr admin all"  on production_partner_requests for all using (is_
 -- site settings: public read, admin write
 create policy "settings public read" on site_settings for select using (true);
 create policy "settings admin write" on site_settings for all using (is_admin()) with check (is_admin());
+
+-- student progress: learners can read their own rows; writes go through RPCs
+create policy "lesson progress own read" on lesson_progress
+  for select using (user_id = auth.uid() or is_admin());
+create policy "lesson progress own insert" on lesson_progress
+  for insert with check (user_id = auth.uid());
+create policy "lesson progress own update" on lesson_progress
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+revoke insert, update on lesson_progress from authenticated;
+grant select on lesson_progress to authenticated;
 
 -- =============================================================
 -- STORAGE BUCKETS
@@ -310,3 +388,95 @@ on conflict (slug) do nothing;
 
 -- Make yourself an admin after signing up:
 -- update profiles set role = 'admin' where email = 'you@example.com';
+
+-- =============================================================
+-- 12. STL ASSIGNMENTS + GOOGLE DRIVE SUBMISSIONS
+-- The binary file lives in Google Drive. Supabase is authoritative for
+-- ownership, lesson linkage, status, grade and instructor feedback.
+-- =============================================================
+create or replace function public.is_reviewer()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('reviewer', 'admin')
+  );
+$$;
+
+create table if not exists public.assignments (
+  id uuid primary key default gen_random_uuid(),
+  lesson_id uuid references public.course_modules(id) on delete restrict not null,
+  title_ar text not null,
+  title_en text not null,
+  description_ar text,
+  description_en text,
+  max_score numeric(8,2) not null default 100 check (max_score > 0),
+  allowed_file_types text[] not null default array['.stl']::text[],
+  max_file_size_mb integer check (max_file_size_mb is null or max_file_size_mb > 0),
+  due_date timestamptz,
+  active boolean not null default true,
+  allow_resubmission boolean not null default true,
+  drive_folder_id text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.assignment_submissions (
+  id uuid primary key default gen_random_uuid(),
+  assignment_id uuid references public.assignments(id) on delete restrict not null,
+  user_id uuid references public.profiles(id) on delete restrict not null,
+  drive_file_id text unique,
+  drive_web_view_link text,
+  original_filename text not null,
+  stored_filename text not null,
+  file_size bigint not null check (file_size >= 0),
+  attempt_number integer not null default 1 check (attempt_number > 0),
+  status text not null default 'uploading'
+    check (status in ('uploading','submitted','under_review','graded','needs_revision','resubmitted','failed')),
+  grade numeric(8,2),
+  admin_feedback text,
+  submitted_at timestamptz,
+  upload_started_at timestamptz not null default now(),
+  graded_at timestamptz,
+  graded_by uuid references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists assignments_lesson_active_idx on public.assignments (lesson_id, active);
+create index if not exists assignment_submissions_user_recent_idx on public.assignment_submissions (user_id, updated_at desc);
+create index if not exists assignment_submissions_queue_idx on public.assignment_submissions (status, submitted_at desc);
+create index if not exists assignment_submissions_assignment_user_idx on public.assignment_submissions (assignment_id, user_id, attempt_number desc);
+create unique index if not exists assignment_submissions_attempt_unique_idx on public.assignment_submissions (assignment_id, user_id, attempt_number);
+
+alter table public.assignments enable row level security;
+alter table public.assignment_submissions enable row level security;
+
+drop policy if exists "assignments course read" on public.assignments;
+create policy "assignments course read" on public.assignments for select using (
+  public.is_reviewer()
+  or (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and coalesce(p.has_access, false) = true
+    )
+    and (
+      active = true
+      or exists (
+        select 1 from public.assignment_submissions s
+        where s.assignment_id = assignments.id and s.user_id = auth.uid()
+      )
+    )
+  )
+);
+
+drop policy if exists "assignment submissions own read" on public.assignment_submissions;
+create policy "assignment submissions own read" on public.assignment_submissions
+  for select using (user_id = auth.uid() or public.is_reviewer());
+
+revoke insert, update, delete on public.assignments from anon, authenticated;
+revoke insert, update, delete on public.assignment_submissions from anon, authenticated;
+grant select on public.assignments to authenticated;
+grant select on public.assignment_submissions to authenticated;

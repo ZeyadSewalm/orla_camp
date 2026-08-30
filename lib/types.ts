@@ -28,7 +28,7 @@ export interface Profile {
   region: Region;
   tier_id: string | null;
   has_access: boolean;
-  role: 'user' | 'admin';
+  role: 'user' | 'reviewer' | 'admin';
   created_at: string;
 }
 
@@ -51,6 +51,18 @@ export interface CourseModule {
   order_index: number;
 }
 
+
+export interface LessonProgress {
+  user_id: string;
+  module_id: string;
+  is_completed: boolean;
+  watch_seconds: number;
+  started_at: string;
+  last_watched_at: string;
+  completed_at: string | null;
+  updated_at: string;
+}
+
 export interface CaseFileSubmission {
   id: string;
   user_id: string;
@@ -62,6 +74,54 @@ export interface CaseFileSubmission {
   reviewed_by: string | null;
   submitted_at: string;
   reviewed_at: string | null;
+}
+
+
+export interface Assignment {
+  id: string;
+  lesson_id: string;
+  title_ar: string;
+  title_en: string;
+  description_ar: string | null;
+  description_en: string | null;
+  max_score: number;
+  allowed_file_types: string[];
+  max_file_size_mb: number | null;
+  due_date: string | null;
+  active: boolean;
+  allow_resubmission: boolean;
+  drive_folder_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AssignmentSubmissionStatus =
+  | 'uploading'
+  | 'submitted'
+  | 'under_review'
+  | 'graded'
+  | 'needs_revision'
+  | 'resubmitted'
+  | 'failed';
+
+export interface AssignmentSubmission {
+  id: string;
+  assignment_id: string;
+  user_id: string;
+  drive_file_id: string | null;
+  drive_web_view_link: string | null;
+  original_filename: string;
+  stored_filename: string;
+  file_size: number;
+  attempt_number: number;
+  status: AssignmentSubmissionStatus;
+  grade: number | null;
+  admin_feedback: string | null;
+  submitted_at: string | null;
+  upload_started_at: string;
+  graded_at: string | null;
+  graded_by: string | null;
+  updated_at: string;
 }
 
 export interface LiveSession {

@@ -11,7 +11,9 @@ export default async function Faq({ params: { locale } }: { params: { locale: st
   const t = await getTranslations('faq');
   // Five questions from the sales sheet. The refund question is deliberately
   // NOT published — the sheet marks it 'do not publish without a confirmed policy'.
-  const items = [1, 2, 3, 4, 5].map((n) => [t(`q${n}` as 'q1'), t(`a${n}` as 'a1')]);
+  // Four questions — the certificate Q&A was removed on request. This loop
+  // still asked for q5, which next-intl treats as a missing message.
+  const items = [1, 2, 3, 4].map((n) => [t(`q${n}` as 'q1'), t(`a${n}` as 'a1')]);
 
   const schema = {
     '@context': 'https://schema.org',
@@ -29,7 +31,7 @@ export default async function Faq({ params: { locale } }: { params: { locale: st
       <dl className="mt-10 space-y-3">
         {items.map(([q, a]) => (
           <div key={q} className="surface-card p-6 md:p-7">
-            <dt className="text-xl font-semibold">{q}</dt>
+            <dt className="text-base font-semibold md:text-lg">{q}</dt>
             <dd className="mt-2 leading-relaxed text-steel">{a}</dd>
           </div>
         ))}

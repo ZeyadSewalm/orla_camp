@@ -28,8 +28,10 @@ export default async function LiveSessions({ params: { locale } }: { params: { l
   const past = sessions.filter((s) => new Date(s.scheduled_at).getTime() < now);
   const ar = locale === 'ar';
 
+  // -u-nu-latn for the same reason prices use it: Arabic-Indic digits fall
+  // back to a different face mid-string and the date renders as a jumble.
   const fmt = (iso: string) =>
-    new Intl.DateTimeFormat(ar ? 'ar-EG' : 'en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Africa/Cairo' })
+    new Intl.DateTimeFormat(ar ? 'ar-EG-u-nu-latn' : 'en-GB', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Africa/Cairo' })
       .format(new Date(iso));
 
   if (!allowed) {

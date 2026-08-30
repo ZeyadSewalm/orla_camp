@@ -1,23 +1,25 @@
 import Link from 'next/link';
 import {
   LayoutDashboard, Users, CreditCard, PlayCircle, ClipboardCheck, Layers,
-  PhoneCall, Radio, MessagesSquare, TicketPercent, FileText, Inbox
+  PhoneCall, Radio, MessagesSquare, TicketPercent, FileText, Inbox, ListChecks
 } from 'lucide-react';
 import { lh } from '@/lib/href';
 
 export const TABS = [
-  'dashboard', 'students', 'payments', 'modules', 'qc', 'tiers',
+  'dashboard', 'students', 'leads', 'payments', 'modules', 'tasks', 'qc', 'tiers',
   'requests', 'sessions', 'community', 'promos', 'content'
 ] as const;
 export type Tab = (typeof TABS)[number];
 
-export const REVIEWER_TABS: Tab[] = ['qc'];
+export const REVIEWER_TABS: Tab[] = ['tasks', 'qc'];
 
 const ICONS: Record<Tab, typeof Users> = {
   dashboard: LayoutDashboard,
   students: Users,
+  leads: Inbox,
   payments: CreditCard,
   modules: PlayCircle,
+  tasks: ListChecks,
   qc: ClipboardCheck,
   tiers: Layers,
   requests: PhoneCall,
@@ -29,13 +31,13 @@ const ICONS: Record<Tab, typeof Users> = {
 
 const GROUPS: Array<{ heading: string; tabs: Tab[] }> = [
   { heading: 'overview', tabs: ['dashboard'] },
-  { heading: 'people', tabs: ['students', 'payments', 'requests'] },
-  { heading: 'course', tabs: ['modules', 'qc', 'sessions'] },
+  { heading: 'people', tabs: ['students', 'leads', 'payments', 'requests'] },
+  { heading: 'course', tabs: ['modules', 'tasks', 'qc', 'sessions'] },
   { heading: 'selling', tabs: ['tiers', 'promos', 'content', 'community'] }
 ];
 
 export function Sidebar({
-  locale, active, labels, groupLabels, allowed, pendingQC = 0
+  locale, active, labels, groupLabels, allowed, pendingQC = 0, pendingTasks = 0
 }: {
   locale: string;
   active: Tab;
@@ -43,6 +45,7 @@ export function Sidebar({
   groupLabels: Record<string, string>;
   allowed: readonly Tab[];
   pendingQC?: number;
+  pendingTasks?: number;
 }) {
   // Dark ground so the sidebar reads as a distinct surface, not page background.
   return (
@@ -79,6 +82,11 @@ export function Sidebar({
                           {pendingQC}
                         </span>
                       )}
+                      {tab === 'tasks' && pendingTasks > 0 && (
+                        <span className="ms-auto figure bg-brass px-1.5 text-[0.68rem] text-ink">
+                          {pendingTasks}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -92,7 +100,7 @@ export function Sidebar({
 }
 
 export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`border border-line bg-white p-7 ${className}`}>{children}</div>;
+  return <div className={`border border-line bg-white p-5 sm:p-7 ${className}`}>{children}</div>;
 }
 
 export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -121,7 +129,7 @@ export function Stat({
         <p className="label mb-0">{label}</p>
         {Icon && <Icon aria-hidden className="h-4 w-4 text-brass" strokeWidth={1.75} />}
       </div>
-      <p className="figure mt-5 text-xl leading-none text-ink">{value}</p>
+      <p className="figure mt-5 text-lg leading-none text-ink sm:text-xl">{value}</p>
       {sub && <p className="mt-3 border-t border-line pt-3 text-xs text-steel">{sub}</p>}
     </div>
   );
