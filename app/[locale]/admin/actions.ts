@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { getProfile, requireAdmin } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { bunnyGuidFrom } from '@/lib/bunny';
 
 async function guard() {
   const admin = await requireAdmin();
@@ -133,13 +134,40 @@ export async function saveModule(formData: FormData) {
     if (!error) thumbUrl = db.storage.from('media').getPublicUrl(path).data.publicUrl;
   }
 
+  /*
+   * THE BUNNY VIDEO ID — previously never written by this action at all.
+   *
+   * The only code path that ever set `bunny_video_id` was the upload widget.
+   * Upload the video inside Bunny's own dashboard instead and there was no way
+   * to attach it: the form had one text box, labelled for Drive, so the Bunny
+   * URL went in there and the lesson played a black rectangle.
+   *
+   * Two inputs are accepted now, in order:
+   *   1. The dedicated Bunny field on the form.
+   *   2. The Drive field — SALVAGE. If someone pastes a Bunny URL there (which
+   *      is exactly what happened, because it was the only box available), take
+   *      the GUID rather than saving a link that can never resolve.
+   *
+   * An existing ID survives when both boxes are empty, so re-saving a module
+   * that was filled by the upload widget does not wipe its video.
+   */
+  const bunnyFromField = bunnyGuidFrom(str(formData.get('bunny_video_id')));
+  const rawVideoLink = str(formData.get('video_link'));
+  const bunnyFromLink = bunnyGuidFrom(rawVideoLink);
+  const bunnyId = bunnyFromField ?? bunnyFromLink ?? str(formData.get('bunny_video_id_current'));
+
+  // A Bunny URL is not a Drive link. Keeping it in video_link would leave the
+  // module looking like it has a Drive video attached when it does not.
+  const videoLink = bunnyFromLink ? null : rawVideoLink;
+
   const payload = {
     title_ar: String(formData.get('title_ar')),
     title_en: String(formData.get('title_en')),
     description_ar: str(formData.get('description_ar')),
     description_en: str(formData.get('description_en')),
-    video_link: str(formData.get('video_link')),
+    video_link: videoLink,
     video_source: str(formData.get('video_source')) ?? 'drive',
+    bunny_video_id: bunnyId,
     checklist_file_url: checklistUrl,
     thumbnail_url: thumbUrl,
     block: str(formData.get('block')) ?? 'foundations',

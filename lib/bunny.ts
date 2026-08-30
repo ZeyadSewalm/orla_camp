@@ -130,3 +130,61 @@ export function bunnyThumbnail(guid: string): string {
   const hostname = process.env.BUNNY_CDN_HOSTNAME;
   return hostname ? `https://${hostname}/${guid}/thumbnail.jpg` : '';
 }
+
+/**
+ * Pulls the video GUID out of anything Bunny might hand you.
+ *
+ * WHY THIS EXISTS
+ *
+ * The admin panel only ever wrote `bunny_video_id` from its own upload widget.
+ * If you uploaded the video inside Bunny's own dashboard instead — which is the
+ * normal thing to do for a large file — there was no way to attach it. The only
+ * text box on the form was the Drive link, so the URL went there, and the
+ * player rendered black: the code saw video_source='bunny' with no GUID, fell
+ * through to driveEmbedUrl(), and that correctly refused to find a Drive ID in
+ * a Bunny URL.
+ *
+ * Bunny shows the same video under several different URLs depending on where
+ * you copy from, and none of them is signposted as "the right one":
+ *
+ *   https://player.mediadelivery.net/play/<lib>/<guid>      ← the Share button
+ *   https://iframe.mediadelivery.net/embed/<lib>/<guid>     ← the Embed snippet
+ *   https://iframe.mediadelivery.net/play/<lib>/<guid>
+ *   https://vz-xxxx.b-cdn.net/<guid>/playlist.m3u8          ← direct CDN
+ *   643ef563-2e56-4da3-af1d-d1ebc18e476f                    ← the bare GUID
+ *
+ * All five are accepted. The GUID is a v4 UUID, which is specific enough that
+ * this cannot mistake a Drive link for a Bunny one.
+ */
+export function bunnyGuidFrom(input: string | null | undefined): string | null {
+  const raw = (input ?? '').trim();
+  if (!raw) return null;
+
+  const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+  // A bare GUID pasted on its own.
+  if (new RegExp(`^${uuid.source}$`, 'i').test(raw)) return raw.toLowerCase();
+
+  // Any Bunny URL. Restricting to Bunny hostnames means a Drive link
+  // containing a UUID-shaped folder name can never be misread as a video.
+  if (/mediadelivery\.net|b-cdn\.net|bunnycdn\.com/i.test(raw)) {
+    const match = raw.match(uuid);
+    if (match) return match[0].toLowerCase();
+  }
+
+  return null;
+}
+
+/**
+ * The library ID embedded in a pasted Bunny URL, if there is one.
+ *
+ * Playback is signed with BUNNY_LIBRARY_ID from the environment, not with
+ * whatever is in the URL. If someone pastes a link from a different library the
+ * GUID saves fine and the embed then 404s — a silent, very confusing failure.
+ * The admin panel compares this against the configured library and says so.
+ */
+export function bunnyLibraryFrom(input: string | null | undefined): string | null {
+  const raw = (input ?? '').trim();
+  if (!raw || !/mediadelivery\.net/i.test(raw)) return null;
+  return raw.match(/mediadelivery\.net\/(?:play|embed)\/(\d+)\//i)?.[1] ?? null;
+}
