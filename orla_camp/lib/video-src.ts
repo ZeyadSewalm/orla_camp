@@ -1,4 +1,4 @@
-import { signedEmbedUrl, bunnyThumbnail } from '@/lib/bunny';
+import { signedEmbedUrl, bunnyThumbnail, bunnyGuidFrom } from '@/lib/bunny';
 import { driveEmbedUrl, driveThumbnail } from '@/lib/drive';
 
 type VideoModule = {
@@ -16,14 +16,39 @@ type VideoModule = {
  * that silently stops signing Bunny URLs.
  */
 export function videoSrcFor(m: VideoModule): string | null {
-  if (m.video_source === 'bunny' && m.bunny_video_id) {
+  /*
+   * Resolve the Bunny GUID from the column first, then from the link.
+   *
+   * The fallback repairs rows already saved the wrong way: before the admin
+   * form had a Bunny field, a Bunny URL could only be pasted into video_link,
+   * which left video_source='bunny' with a null bunny_video_id. That
+   * combination used to fall through to driveEmbedUrl(), which correctly
+   * refuses to find a Drive ID in a Bunny URL and returned null — a black
+   * player with no explanation. Reading the GUID out of the link makes those
+   * lessons play without anyone having to re-enter them.
+   */
+  const guid = m.bunny_video_id ?? bunnyGuidFrom(m.video_link);
+
+  if (m.video_source === 'bunny' && guid) {
     try {
-      return signedEmbedUrl(m.bunny_video_id);
+      return signedEmbedUrl(guid);
     } catch {
       // Bunny not configured — fall through rather than break the page.
       return null;
     }
   }
+
+  // A Bunny link on a module still marked 'drive' is a mismatched source, not
+  // a Drive video. Play it rather than handing driveEmbedUrl a URL it cannot
+  // parse.
+  if (guid) {
+    try {
+      return signedEmbedUrl(guid);
+    } catch {
+      return null;
+    }
+  }
+
   return m.video_link ? driveEmbedUrl(m.video_link) : null;
 }
 
@@ -31,7 +56,8 @@ export function posterFor(m: VideoModule): string | null {
   // Order matters: an explicitly uploaded image is a deliberate choice and
   // always wins over anything generated.
   if (m.thumbnail_url) return m.thumbnail_url;
-  if (m.video_source === 'bunny' && m.bunny_video_id) return bunnyThumbnail(m.bunny_video_id);
+  const guid = m.bunny_video_id ?? bunnyGuidFrom(m.video_link);
+  if (guid) return bunnyThumbnail(guid);
   // Drive makes a thumbnail for every video it holds. Without this, every
   // Drive module with no uploaded image showed a black rectangle.
   if (m.video_link) return driveThumbnail(m.video_link);

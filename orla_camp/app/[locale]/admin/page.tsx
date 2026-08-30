@@ -12,7 +12,7 @@ import CaseFileLink from '@/components/admin/CaseFileLink';
 import SubmitButton, { SubmitLink } from '@/components/SubmitButton';
 import { Users, Wallet, ClipboardCheck, Coins } from 'lucide-react';
 import BunnyUpload from '@/components/admin/BunnyUpload';
-import { isBunnyConfigured } from '@/lib/bunny';
+import { isBunnyConfigured, bunnyLibraryFrom } from '@/lib/bunny';
 import { isGoogleDriveConfigured } from '@/lib/google-drive';
 import {
   updateTier, saveModule, deleteModule, reviewCaseFile, updateRequest,
@@ -181,7 +181,40 @@ async function Modules({ db, t }: { db: DB; t: { save: string; add: string; del:
         </select>
       </Field>
 
-      <Field label="Google Drive video link" hint="Only used when the source above is set to Drive. Share → Anyone with the link → Viewer.">
+      <Field
+        label="Bunny video ID or link"
+        hint="Paste the Bunny share link or the video GUID. Use this when the video was uploaded in the Bunny dashboard instead of the uploader below. Leave blank to keep what's already attached."
+      >
+        <input
+          name="bunny_video_id"
+          defaultValue=""
+          placeholder={m?.bunny_video_id ?? 'https://player.mediadelivery.net/play/… or the GUID'}
+          className="field"
+        />
+        {/* Carries the current value through the save so an empty box means
+            "leave it alone" rather than "detach the video". */}
+        <input type="hidden" name="bunny_video_id_current" value={m?.bunny_video_id ?? ''} />
+        {m?.bunny_video_id && (
+          <p className="mt-1.5 text-xs text-steel">
+            Attached: <code className="break-all">{m.bunny_video_id}</code>
+          </p>
+        )}
+        {m?.video_source === 'bunny' && !m?.bunny_video_id && (
+          <p className="mt-1.5 text-xs font-semibold text-red-700">
+            ⚠ Source is set to Bunny but no video is attached — the lesson will show a black
+            player. Paste the Bunny link above and save.
+          </p>
+        )}
+        {bunnyLibraryFrom(m?.video_link) && bunnyLibraryFrom(m?.video_link) !== process.env.BUNNY_LIBRARY_ID && (
+          <p className="mt-1.5 text-xs font-semibold text-red-700">
+            ⚠ That link is from Bunny library {bunnyLibraryFrom(m?.video_link)}, but this site is
+            configured for library {process.env.BUNNY_LIBRARY_ID ?? '(not set)'}. Playback will
+            fail until they match.
+          </p>
+        )}
+      </Field>
+
+      <Field label="Google Drive video link" hint="Only used when the source above is set to Drive. Share → Anyone with the link → Viewer. A Bunny link pasted here is moved to the Bunny field automatically.">
         <input name="video_link" defaultValue={m?.video_link ?? ''} className="field" />
       </Field>
 

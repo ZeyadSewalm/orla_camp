@@ -5,8 +5,7 @@ import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
 import VideoEmbed from '@/components/VideoEmbed';
 import ModuleComplete from '@/components/ModuleComplete';
 import StudentDashboard from '@/components/StudentDashboard';
-import { driveEmbedUrl } from '@/lib/drive';
-import { bunnyThumbnail, signedEmbedUrl } from '@/lib/bunny';
+import { videoSrcFor, posterFor } from '@/lib/video-src';
 import UploadCaseFile from '@/components/UploadCaseFile';
 import AssignmentTask from '@/components/AssignmentTask';
 import { createClient, getSessionUser } from '@/lib/supabase/server';
@@ -18,20 +17,15 @@ import { Lock } from 'lucide-react';
 export const metadata: Metadata = { robots: { index: false } };
 export const dynamic = 'force-dynamic';
 
-/**
- * Resolves the playable URL on the SERVER, after the access check above has
- * already passed. Bunny URLs are signed here and expire within the hour.
+/*
+ * videoSrcFor and posterFor now come from lib/video-src.ts.
+ *
+ * A second copy of this logic used to live here, and lib/video-src.ts warned in
+ * its own header that the two would drift and that the drifting copy would be
+ * the one that stopped signing Bunny URLs. That is what happened: the fix for
+ * Bunny links pasted into the Drive field went into the shared helper, and this
+ * page — the one that actually plays the lessons — would not have received it.
  */
-function videoSrcFor(m: { video_source: string | null; bunny_video_id: string | null; video_link: string | null }) {
-  if (m.video_source === 'bunny' && m.bunny_video_id) {
-    try {
-      return signedEmbedUrl(m.bunny_video_id);
-    } catch {
-      return null;
-    }
-  }
-  return m.video_link ? driveEmbedUrl(m.video_link) : null;
-}
 
 export default async function Course({ params: { locale } }: { params: { locale: string } }) {
   unstable_setRequestLocale(locale);
@@ -334,7 +328,7 @@ export default async function Course({ params: { locale } }: { params: { locale:
               ) : (
               <VideoEmbed
                 src={videoSrcFor(m)}
-                poster={m.thumbnail_url ?? (m.video_source === 'bunny' && m.bunny_video_id ? bunnyThumbnail(m.bunny_video_id) : null)}
+                poster={posterFor(m)}
                 title={ar ? m.title_ar : m.title_en}
                 moduleId={m.id}
                 durationMinutes={m.duration_minutes}
