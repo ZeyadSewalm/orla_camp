@@ -2,36 +2,26 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
-import VideoEmbed from '@/components/VideoEmbed';
-import ModuleComplete from '@/components/ModuleComplete';
 import StudentDashboard from '@/components/StudentDashboard';
-import { driveEmbedUrl } from '@/lib/drive';
-import { bunnyThumbnail, signedEmbedUrl } from '@/lib/bunny';
-import UploadCaseFile from '@/components/UploadCaseFile';
-import AssignmentTask from '@/components/AssignmentTask';
+import CoursePlayer, { type CourseLessonVM } from '@/components/CoursePlayer';
+import { videoSrcFor, posterFor } from '@/lib/video-src';
 import { createClient, getSessionUser } from '@/lib/supabase/server';
 import { getCachedProfile, getModules, getSiteSettings } from '@/lib/data';
 import type { Assignment, AssignmentSubmission, CourseModule, LessonProgress } from '@/lib/types';
 import { lh } from '@/lib/href';
-import { Lock } from 'lucide-react';
 
 export const metadata: Metadata = { robots: { index: false } };
 export const dynamic = 'force-dynamic';
 
-/**
- * Resolves the playable URL on the SERVER, after the access check above has
- * already passed. Bunny URLs are signed here and expire within the hour.
+/*
+ * videoSrcFor and posterFor now come from lib/video-src.ts.
+ *
+ * A second copy of this logic used to live here, and lib/video-src.ts warned in
+ * its own header that the two would drift and that the drifting copy would be
+ * the one that stopped signing Bunny URLs. That is what happened: the fix for
+ * Bunny links pasted into the Drive field went into the shared helper, and this
+ * page — the one that actually plays the lessons — would not have received it.
  */
-function videoSrcFor(m: { video_source: string | null; bunny_video_id: string | null; video_link: string | null }) {
-  if (m.video_source === 'bunny' && m.bunny_video_id) {
-    try {
-      return signedEmbedUrl(m.bunny_video_id);
-    } catch {
-      return null;
-    }
-  }
-  return m.video_link ? driveEmbedUrl(m.video_link) : null;
-}
 
 export default async function Course({ params: { locale } }: { params: { locale: string } }) {
   unstable_setRequestLocale(locale);
@@ -254,6 +244,49 @@ export default async function Course({ params: { locale } }: { params: { locale:
 
   activities.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
+  /*
+   * The lesson list handed to the client player. Locked lessons still carry
+   * their title/description/duration (so the sidebar can show what's coming
+   * next) but src/poster are null and assignments are withheld — exactly the
+   * same "no src at all for a locked lesson" rule the old server-rendered
+   * list enforced, just computed once here instead of per-<article>.
+   */
+  const lessons: CourseLessonVM[] = modules.map((m: CourseModule, i: number) => {
+    const unlocked = unlockedModuleIds.has(m.id);
+    const progressRow = progressByModule.get(m.id);
+    return {
+      id: m.id,
+      index: i + 1,
+      title: ar ? m.title_ar : m.title_en,
+      description: ar ? m.description_ar : m.description_en,
+      block: m.block,
+      durationMinutes: m.duration_minutes,
+      unlocked,
+      isFreePreview: m.is_free_preview,
+      src: unlocked ? videoSrcFor(m) : null,
+      poster: unlocked ? posterFor(m) : null,
+      completed: progressRow?.is_completed ?? false,
+      watchSeconds: progressRow?.watch_seconds ?? 0,
+      checklistUrl: unlocked ? m.checklist_file_url : null,
+      previousTitle: i > 0 ? (ar ? modules[i - 1].title_ar : modules[i - 1].title_en) : null,
+      assignments: unlocked ? assignmentsByLesson.get(m.id) ?? [] : [],
+      submissionsByAssignment: unlocked
+        ? Object.fromEntries(
+            (assignmentsByLesson.get(m.id) ?? []).map((a) => [a.id, latestTaskSubmissionByAssignment.get(a.id) ?? null])
+          )
+        : {}
+    };
+  });
+
+  const mostRecentProgress = [...progress].sort(
+    (a, b) => new Date(b.last_watched_at).getTime() - new Date(a.last_watched_at).getTime()
+  )[0];
+  const initialActiveId =
+    (mostRecentProgress && unlockedModuleIds.has(mostRecentProgress.module_id) && mostRecentProgress.module_id) ||
+    lessons.find((l) => l.unlocked && !l.completed)?.id ||
+    lessons[0]?.id ||
+    '';
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-5 sm:py-10 md:py-14">
       <StudentDashboard
@@ -285,89 +318,15 @@ export default async function Course({ params: { locale } }: { params: { locale:
           </Link>
         </div>
 
-        {modules.length === 0 && (
+        {modules.length === 0 ? (
           <div className="mt-8 rounded-2xl border border-ink/10 bg-white p-6 text-sm text-steel">
             {t('empty')}
           </div>
+        ) : (
+          <div className="mt-8">
+            <CoursePlayer locale={locale} userId={profile.id} lessons={lessons} initialActiveId={initialActiveId} />
+          </div>
         )}
-
-        <div className="mt-10 space-y-12 md:space-y-16">
-          {modules.map((m: CourseModule, i: number) => {
-            const unlocked = unlockedModuleIds.has(m.id);
-            const previousTitle = i > 0 ? (ar ? modules[i - 1].title_ar : modules[i - 1].title_en) : '';
-            return (
-            <article
-              key={m.id}
-              id={`lesson-${m.id}`}
-              className={`scroll-mt-28 rounded-[2rem] border border-ink/10 bg-white p-4 soft-shadow sm:p-6 md:p-8 ${unlocked ? '' : 'opacity-70'}`}
-            >
-              <div className="mb-5 flex items-start gap-4">
-                <span className="figure flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brass/10 text-xs font-medium text-brass">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <div>
-                  <h3 className="font-display text-lg font-black sm:text-xl">{ar ? m.title_ar : m.title_en}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-steel">{ar ? m.description_ar : m.description_en}</p>
-                </div>
-              </div>
-
-              {!unlocked ? (
-                /*
-                  No <VideoEmbed> at all for a locked lesson — not a hidden
-                  one. The src is never computed, so it is not in the page
-                  source either.
-                */
-                <div className="flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-ink/20 bg-paper px-6 text-center">
-                  <Lock aria-hidden className="h-7 w-7 text-steel" />
-                  <p className="text-sm font-semibold">
-                    {ar ? 'هذا الدرس مقفل' : 'This lesson is locked'}
-                  </p>
-                  <p className="max-w-sm text-xs leading-relaxed text-steel">
-                    {ar
-                      ? `أكمِل درس «${previousTitle}» وسلّم مهمته لفتح هذا الدرس.`
-                      : `Finish “${previousTitle}” and submit its task to unlock this lesson.`}
-                  </p>
-                  <a href={`#lesson-${modules[i - 1]?.id ?? ''}`} className="btn-quiet mt-1 text-xs">
-                    {ar ? 'اذهب إلى الدرس السابق' : 'Go to the previous lesson'}
-                  </a>
-                </div>
-              ) : (
-              <VideoEmbed
-                src={videoSrcFor(m)}
-                poster={m.thumbnail_url ?? (m.video_source === 'bunny' && m.bunny_video_id ? bunnyThumbnail(m.bunny_video_id) : null)}
-                title={ar ? m.title_ar : m.title_en}
-                moduleId={m.id}
-                durationMinutes={m.duration_minutes}
-              />
-              )}
-
-              <div className={`mt-4 flex flex-wrap items-center gap-3 ${unlocked ? '' : 'hidden'}`}>
-                {m.checklist_file_url && (
-                  <a href={m.checklist_file_url} target="_blank" rel="noopener" className="btn-quiet text-sm">
-                    {t('checklist')}
-                  </a>
-                )}
-                <UploadCaseFile moduleId={m.id} userId={profile.id} />
-                <ModuleComplete
-                  moduleId={m.id}
-                  initialDone={progressByModule.get(m.id)?.is_completed ?? false}
-                  labels={{ done: t('markedDone'), markDone: t('markDone') }}
-                />
-              </div>
-
-
-              {(assignmentsByLesson.get(m.id) ?? []).map((assignment) => (
-                <AssignmentTask
-                  key={assignment.id}
-                  assignment={assignment}
-                  latestSubmission={latestTaskSubmissionByAssignment.get(assignment.id) ?? null}
-                  locale={locale}
-                />
-              ))}
-            </article>
-            );
-          })}
-        </div>
       </section>
     </div>
   );
