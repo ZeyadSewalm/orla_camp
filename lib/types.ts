@@ -49,6 +49,8 @@ export interface CourseModule {
   bunny_video_id: string | null;
   video_duration_seconds: number | null;
   order_index: number;
+  /** Packages (tiers) this lesson is assigned to. Null/empty = visible to every package with access. */
+  tier_ids: string[] | null;
 }
 
 

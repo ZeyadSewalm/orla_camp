@@ -133,7 +133,11 @@ async function Tiers({ db, save }: { db: DB; save: string }) {
 
 /* ---------------------------------------------------------------- modules */
 async function Modules({ db, t }: { db: DB; t: { save: string; add: string; del: string; emptyModules: string; emptyModulesBody: string } }) {
-  const { data: modules } = await db.from('course_modules').select('*').order('order_index');
+  const [{ data: modules }, { data: tiers }] = await Promise.all([
+    db.from('course_modules').select('*').order('order_index'),
+    db.from('tiers').select('id,name_en').order('order_index')
+  ]);
+  const tierNameById = new Map((tiers ?? []).map((x) => [x.id, x.name_en]));
   const bunnyOn = isBunnyConfigured();
   const uploadLabels = {
     choose: 'Upload video',
@@ -232,6 +236,28 @@ async function Modules({ db, t }: { db: DB; t: { save: string; add: string; del:
         Free preview — viewable without a paid plan
       </label>
 
+      <div>
+        <span className="label">Packages (none checked = every package)</span>
+        <p className="mb-1.5 text-xs text-steel">
+          Check one or more to restrict this lesson to those packages only. Leave all unchecked to
+          keep it visible to anyone with access, same as before this field existed.
+        </p>
+        <div className="flex flex-wrap gap-3 text-sm">
+          {(tiers ?? []).map((x) => (
+            <label key={x.id} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                name="tier_ids"
+                value={x.id}
+                defaultChecked={m?.tier_ids?.includes(x.id)}
+                className="h-4 w-4"
+              />
+              {x.name_en}
+            </label>
+          ))}
+        </div>
+      </div>
+
       <SubmitButton>{m ? t.save : t.add}</SubmitButton>
     </form>
   );
@@ -294,6 +320,11 @@ async function Modules({ db, t }: { db: DB; t: { save: string; add: string; del:
                 {m.status === 'available' ? <Pill tone="ok">available</Pill> : <Pill tone="mute">coming</Pill>}
                 {m.is_free_preview && <Pill tone="warn">free</Pill>}
                 {m.video_source === 'bunny' && m.bunny_video_id ? <Pill tone="ok">bunny</Pill> : m.video_link ? <Pill tone="mute">drive</Pill> : <Pill tone="warn">no video</Pill>}
+                {m.tier_ids?.length ? (
+                  <Pill tone="mute">{m.tier_ids.map((id: string) => tierNameById.get(id) ?? '?').join(', ')}</Pill>
+                ) : (
+                  <Pill tone="ok">all packages</Pill>
+                )}
               </p>
             </div>
           </div>

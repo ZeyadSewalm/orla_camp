@@ -160,6 +160,12 @@ export async function saveModule(formData: FormData) {
   // module looking like it has a Drive video attached when it does not.
   const videoLink = bunnyFromLink ? null : rawVideoLink;
 
+  // Which packages this lesson belongs to. Same shape as
+  // promo_codes.applicable_tiers: an empty selection means "every package",
+  // not "no package" — nobody who already has access should lose a lesson
+  // just because it was saved before this field existed.
+  const tierIds = formData.getAll('tier_ids').map(String).filter(Boolean);
+
   const payload = {
     title_ar: String(formData.get('title_ar')),
     title_en: String(formData.get('title_en')),
@@ -174,7 +180,8 @@ export async function saveModule(formData: FormData) {
     status: str(formData.get('status')) ?? 'coming',
     duration_minutes: num(formData.get('duration_minutes')),
     is_free_preview: formData.get('is_free_preview') === 'on',
-    order_index: num(formData.get('order_index')) ?? 0
+    order_index: num(formData.get('order_index')) ?? 0,
+    tier_ids: tierIds.length ? tierIds : null
   };
 
   if (id) await db.from('course_modules').update(payload).eq('id', id);

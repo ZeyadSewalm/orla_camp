@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
@@ -9,13 +10,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  List,
   Lock,
   PartyPopper,
   Play,
   PlayCircle,
-  Square
+  Square,
+  X
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { lh } from '@/lib/href';
 import VideoEmbed from '@/components/VideoEmbed';
 import UploadCaseFile from '@/components/UploadCaseFile';
 import AssignmentTask from '@/components/AssignmentTask';
@@ -29,6 +33,8 @@ export type CourseLessonVM = {
   block: string | null;
   durationMinutes: number | null;
   unlocked: boolean;
+  /** Locked because the signed-in student's package doesn't include this lesson (as opposed to sequential order). */
+  tierBlocked: boolean;
   isFreePreview: boolean;
   src: string | null;
   poster: string | null;
@@ -73,6 +79,7 @@ export default function CoursePlayer({
   const [justDoneId, setJustDoneId] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileListOpen, setMobileListOpen] = useState(false);
   const mainRef = useRef<HTMLDivElement | null>(null);
   const pendingAdvanceId = useRef<string | null>(null);
   const advancedOnceRef = useRef<Set<string>>(new Set());
@@ -114,6 +121,16 @@ export default function CoursePlayer({
     const key = active?.block?.trim() || '__general__';
     setOpenSections((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
   }, [activeId, lessonById]);
+
+  // Lock background scroll while the mobile curriculum sheet is open.
+  useEffect(() => {
+    if (!mobileListOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [mobileListOpen]);
 
   // Once a just-completed lesson's follow-up unlocks (via router.refresh()),
   // jump to it and scroll the player back into view.
@@ -217,8 +234,107 @@ export default function CoursePlayer({
       : null;
   const lecturesLabel = `${totalCount} ${totalCount === 1 ? t('lecture') : t('lectures')}`;
 
+  // Shared curriculum list markup — used by both the desktop sticky sidebar
+  // and the mobile bottom-sheet, so the two never drift apart. `onSelect`
+  // lets the mobile sheet close itself right after a lesson is picked.
+  const renderSections = (onSelect: (lesson: CourseLessonVM) => void) =>
+    sections.map((section) => {
+      const sectionDone = section.items.filter((l) => completedMap[l.id]).length;
+      const isOpen = openSections[section.key] ?? false;
+      return (
+        <div key={section.key} className="border-b border-ink/10 last:border-0">
+          {section.title && (
+            <button
+              type="button"
+              onClick={() => toggleSection(section.key)}
+              aria-expanded={isOpen}
+              className="flex w-full items-center justify-between gap-3 bg-ink/[0.02] px-4 py-3 text-start sm:px-5"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-ink">{section.title}</span>
+                <span className="figure text-[0.7rem] text-steel">
+                  {t('sectionProgress', { done: sectionDone, total: section.items.length })}
+                </span>
+              </span>
+              <ChevronDown
+                aria-hidden
+                className={`h-4 w-4 shrink-0 text-steel transition-transform ${isOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+          )}
+
+          {(isOpen || !section.title) && (
+            <ul>
+              {section.items.map((lesson) => {
+                const isActive = lesson.id === active.id;
+                const done = !!completedMap[lesson.id];
+                const inProgress = !done && lesson.unlocked && lesson.watchSeconds > 0;
+                const duration = formatDuration(lesson.durationMinutes);
+                return (
+                  <li key={lesson.id}>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(lesson)}
+                      aria-disabled={!lesson.unlocked}
+                      aria-current={isActive ? 'true' : undefined}
+                      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition sm:px-5 ${
+                        isActive ? 'bg-brass/[0.07]' : lesson.unlocked ? 'hover:bg-ink/[0.025]' : 'opacity-60 hover:bg-ink/[0.015]'
+                      } ${isActive ? 'border-l-2 border-brass' : 'border-l-2 border-transparent'}`}
+                    >
+                      <span className="mt-0.5 shrink-0">
+                        {!lesson.unlocked ? (
+                          <Lock aria-hidden className="h-4 w-4 text-steel" />
+                        ) : done ? (
+                          <CheckSquare aria-hidden className={`h-4 w-4 text-brass ${justDoneId === lesson.id ? 'check-pop' : ''}`} strokeWidth={2} />
+                        ) : (
+                          <Square aria-hidden className={`h-4 w-4 ${inProgress ? 'text-brass' : 'text-line'}`} strokeWidth={inProgress ? 2 : 1.5} />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className={`block truncate text-sm ${isActive ? 'font-semibold text-ink' : done ? 'text-steel' : 'text-ink'}`}>
+                          {lesson.index}. {lesson.title}
+                        </span>
+                        <span className="mt-0.5 flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-2 text-[0.7rem] text-steel">
+                            {duration && (
+                              <span className="inline-flex items-center gap-1">
+                                <Play aria-hidden className="h-3 w-3" strokeWidth={1.5} />
+                                {duration}
+                              </span>
+                            )}
+                            {lesson.isFreePreview && (
+                              <span className="rounded-full bg-brass/10 px-1.5 py-0.5 font-semibold text-brass">
+                                {t('freePreview')}
+                              </span>
+                            )}
+                          </span>
+                          {lesson.unlocked && lesson.checklistUrl && (
+                            <a
+                              href={lesson.checklistUrl}
+                              target="_blank"
+                              rel="noopener"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ink/10 px-2 py-0.5 text-[0.65rem] text-steel transition hover:border-ink/30 hover:text-ink"
+                            >
+                              <Download aria-hidden className="h-3 w-3" />
+                              {t('resources')}
+                            </a>
+                          )}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      );
+    });
+
   return (
-    /*
+    <>
+    {/*
      * dir="ltr" HERE ON PURPOSE.
      *
      * Udemy's own course player keeps video-left / curriculum-right even for
@@ -227,7 +343,7 @@ export default function CoursePlayer({
      * that's Unicode bidi, not this attribute). Forcing ltr just on this grid
      * pins the two panes to that same fixed arrangement instead of the RTL
      * auto-mirroring the rest of the site correctly uses everywhere else.
-     */
+     */}
     <div dir="ltr" className={`grid gap-6 lg:items-start lg:gap-8 ${sidebarOpen ? 'lg:grid-cols-[1fr_23rem]' : 'lg:grid-cols-[1fr_auto]'}`}>
       {/* ---------------------------------------------------------------- */}
       {/* MAIN: active lesson                                              */}
@@ -237,11 +353,20 @@ export default function CoursePlayer({
           {!active.unlocked ? (
             <div className="-mx-4 flex aspect-[4/3] w-[calc(100%+2rem)] flex-col items-center justify-center gap-3 bg-paper px-6 text-center sm:mx-0 sm:aspect-video sm:w-full sm:rounded-t-[2rem]">
               <Lock aria-hidden className="h-7 w-7 text-steel" />
-              <p className="text-sm font-semibold">{t('lockedLesson')}</p>
-              {active.previousTitle && (
-                <p className="max-w-sm text-xs leading-relaxed text-steel">
-                  {t('lockedHint', { previous: active.previousTitle })}
-                </p>
+              <p className="text-sm font-semibold">{active.tierBlocked ? t('tierLockedLesson') : t('lockedLesson')}</p>
+              {active.tierBlocked ? (
+                <>
+                  <p className="max-w-sm text-xs leading-relaxed text-steel">{t('tierLockedHint')}</p>
+                  <Link href={lh(locale, '/pricing')} className="btn-quiet text-xs">
+                    {t('viewPlans')}
+                  </Link>
+                </>
+              ) : (
+                active.previousTitle && (
+                  <p className="max-w-sm text-xs leading-relaxed text-steel">
+                    {t('lockedHint', { previous: active.previousTitle })}
+                  </p>
+                )
               )}
             </div>
           ) : (
@@ -422,102 +547,78 @@ export default function CoursePlayer({
           </div>
 
           <div className="max-h-[36rem] overflow-y-auto sm:max-h-[calc(100vh-11rem)]">
-            {sections.map((section) => {
-              const sectionDone = section.items.filter((l) => completedMap[l.id]).length;
-              const isOpen = openSections[section.key] ?? false;
-              return (
-                <div key={section.key} className="border-b border-ink/10 last:border-0">
-                  {section.title && (
-                    <button
-                      type="button"
-                      onClick={() => toggleSection(section.key)}
-                      aria-expanded={isOpen}
-                      className="flex w-full items-center justify-between gap-3 bg-ink/[0.02] px-4 py-3 text-start sm:px-5"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-ink">{section.title}</span>
-                        <span className="figure text-[0.7rem] text-steel">
-                          {t('sectionProgress', { done: sectionDone, total: section.items.length })}
-                        </span>
-                      </span>
-                      <ChevronDown
-                        aria-hidden
-                        className={`h-4 w-4 shrink-0 text-steel transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                  )}
-
-                  {(isOpen || !section.title) && (
-                    <ul>
-                      {section.items.map((lesson) => {
-                        const isActive = lesson.id === active.id;
-                        const done = !!completedMap[lesson.id];
-                        const inProgress = !done && lesson.unlocked && lesson.watchSeconds > 0;
-                        const duration = formatDuration(lesson.durationMinutes);
-                        return (
-                          <li key={lesson.id}>
-                            <button
-                              type="button"
-                              onClick={() => selectLesson(lesson)}
-                              aria-disabled={!lesson.unlocked}
-                              aria-current={isActive ? 'true' : undefined}
-                              className={`flex w-full items-start gap-3 px-4 py-3 text-left transition sm:px-5 ${
-                                isActive ? 'bg-brass/[0.07]' : lesson.unlocked ? 'hover:bg-ink/[0.025]' : 'opacity-60 hover:bg-ink/[0.015]'
-                              } ${isActive ? 'border-l-2 border-brass' : 'border-l-2 border-transparent'}`}
-                            >
-                              <span className="mt-0.5 shrink-0">
-                                {!lesson.unlocked ? (
-                                  <Lock aria-hidden className="h-4 w-4 text-steel" />
-                                ) : done ? (
-                                  <CheckSquare aria-hidden className={`h-4 w-4 text-brass ${justDoneId === lesson.id ? 'check-pop' : ''}`} strokeWidth={2} />
-                                ) : (
-                                  <Square aria-hidden className={`h-4 w-4 ${inProgress ? 'text-brass' : 'text-line'}`} strokeWidth={inProgress ? 2 : 1.5} />
-                                )}
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className={`block truncate text-sm ${isActive ? 'font-semibold text-ink' : done ? 'text-steel' : 'text-ink'}`}>
-                                  {lesson.index}. {lesson.title}
-                                </span>
-                                <span className="mt-0.5 flex items-center justify-between gap-2">
-                                  <span className="flex items-center gap-2 text-[0.7rem] text-steel">
-                                    {duration && (
-                                      <span className="inline-flex items-center gap-1">
-                                        <Play aria-hidden className="h-3 w-3" strokeWidth={1.5} />
-                                        {duration}
-                                      </span>
-                                    )}
-                                    {lesson.isFreePreview && (
-                                      <span className="rounded-full bg-brass/10 px-1.5 py-0.5 font-semibold text-brass">
-                                        {t('freePreview')}
-                                      </span>
-                                    )}
-                                  </span>
-                                  {lesson.unlocked && lesson.checklistUrl && (
-                                    <a
-                                      href={lesson.checklistUrl}
-                                      target="_blank"
-                                      rel="noopener"
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ink/10 px-2 py-0.5 text-[0.65rem] text-steel transition hover:border-ink/30 hover:text-ink"
-                                    >
-                                      <Download aria-hidden className="h-3 w-3" />
-                                      {t('resources')}
-                                    </a>
-                                  )}
-                                </span>
-                              </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              );
-            })}
+            {renderSections(selectLesson)}
           </div>
         </div>
       </aside>
     </div>
+
+    {/* ------------------------------------------------------------------ */}
+    {/* MOBILE: floating "course content" quick-access + bottom sheet       */}
+    {/* The desktop sidebar sits far below the fold on phones (video +      */}
+    {/* description + buttons + assignments all come first), so this gives */}
+    {/* a one-tap shortcut to the curriculum from anywhere on the page.     */}
+    {/* ------------------------------------------------------------------ */}
+    <button
+      type="button"
+      onClick={() => setMobileListOpen(true)}
+      className="fixed bottom-5 end-5 z-30 flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-xs font-semibold text-white shadow-lg shadow-ink/25 transition active:scale-95 lg:hidden"
+    >
+      <List aria-hidden className="h-4 w-4" />
+      {t('courseContent')}
+      <span className="figure rounded-full bg-white/15 px-1.5 py-0.5 text-[0.65rem]">
+        {doneCount}/{totalCount}
+      </span>
+    </button>
+
+    {mobileListOpen && (
+      <div className="fixed inset-0 z-40 flex flex-col justify-end lg:hidden" role="dialog" aria-modal="true">
+        <button
+          type="button"
+          aria-label={t('hideSidebar')}
+          onClick={() => setMobileListOpen(false)}
+          className="absolute inset-0 bg-ink/50"
+        />
+        <div dir="ltr" className="relative flex max-h-[80vh] flex-col overflow-hidden rounded-t-[1.75rem] bg-white shadow-2xl">
+          <div className="flex items-start justify-between gap-3 border-b border-ink/10 p-4 sm:p-5">
+            <div className="min-w-0">
+              <h3 className="font-display text-sm font-black sm:text-base">{t('courseContent')}</h3>
+              <p className="mt-1 text-[0.7rem] text-steel">
+                {lecturesLabel}
+                {totalLengthLabel && (
+                  <span dir="ltr" className="figure">
+                    {' '}
+                    • {totalLengthLabel}
+                  </span>
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileListOpen(false)}
+              aria-label={t('hideSidebar')}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-steel transition hover:bg-ink/5 hover:text-ink"
+            >
+              <X aria-hidden className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="px-4 pt-3 sm:px-5">
+            <div className="h-1.5 overflow-hidden rounded-full bg-ink/[0.08]">
+              <div
+                className="h-full rounded-full bg-brass transition-[width] duration-500"
+                style={{ width: `${totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0}%` }}
+              />
+            </div>
+          </div>
+          <div className="mt-1 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+            {renderSections((lesson) => {
+              selectLesson(lesson);
+              setMobileListOpen(false);
+            })}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

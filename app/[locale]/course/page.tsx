@@ -111,6 +111,7 @@ export default async function Course({ params: { locale } }: { params: { locale:
     }
   }
 
+  const ar = locale === 'ar';
   const isStaff = profile.role === 'admin' || profile.role === 'reviewer';
 
   /**
@@ -127,12 +128,32 @@ export default async function Course({ params: { locale } }: { params: { locale:
     });
   }
 
+  /*
+   * PACKAGE (TIER) GATING.
+   *
+   * A module with no tier_ids is open to every package, same as before this
+   * existed. One that lists specific tiers only opens for a student whose own
+   * tier_id is in that list — staff bypass it, same as they bypass sequential
+   * unlocking, since a reviewer has to be able to open anything to review it.
+   */
+  const studentTierId = profile.tier_id;
+  function tierAllowed(m: CourseModule) {
+    return isStaff || !m.tier_ids || m.tier_ids.length === 0 || (!!studentTierId && m.tier_ids.includes(studentTierId));
+  }
+
+  // Sequential unlocking walks only the lessons this student's package can
+  // ever see — a module outside their package doesn't count as "the previous
+  // lesson" for the ones on either side of it, and never unlocks no matter
+  // what they complete.
+  const visibleModules = modules.filter((m) => tierAllowed(m));
   const unlockedModuleIds = new Set<string>();
-  for (let i = 0; i < modules.length; i += 1) {
-    const current = modules[i];
+  const previousVisibleTitleByModuleId = new Map<string, string | null>();
+  for (let i = 0; i < visibleModules.length; i += 1) {
+    const current = visibleModules[i];
     // The first lesson is always open, and so is anything already started —
     // nobody who has begun a lesson should ever find it locked behind them.
-    const previous = i === 0 ? null : modules[i - 1];
+    const previous = i === 0 ? null : visibleModules[i - 1];
+    previousVisibleTitleByModuleId.set(current.id, previous ? (ar ? previous.title_ar : previous.title_en) : null);
     const open =
       isStaff ||
       i === 0 ||
@@ -141,8 +162,6 @@ export default async function Course({ params: { locale } }: { params: { locale:
       (previous ? lessonFinished(previous.id) : true);
     if (open) unlockedModuleIds.add(current.id);
   }
-
-  const ar = locale === 'ar';
 
   const authName =
     (typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()) ||
@@ -262,13 +281,14 @@ export default async function Course({ params: { locale } }: { params: { locale:
       block: m.block,
       durationMinutes: m.duration_minutes,
       unlocked,
+      tierBlocked: !tierAllowed(m),
       isFreePreview: m.is_free_preview,
       src: unlocked ? videoSrcFor(m) : null,
       poster: unlocked ? posterFor(m) : null,
       completed: progressRow?.is_completed ?? false,
       watchSeconds: progressRow?.watch_seconds ?? 0,
       checklistUrl: unlocked ? m.checklist_file_url : null,
-      previousTitle: i > 0 ? (ar ? modules[i - 1].title_ar : modules[i - 1].title_en) : null,
+      previousTitle: previousVisibleTitleByModuleId.get(m.id) ?? null,
       assignments: unlocked ? assignmentsByLesson.get(m.id) ?? [] : [],
       submissionsByAssignment: unlocked
         ? Object.fromEntries(

@@ -74,7 +74,7 @@ export const getModules = unstable_cache(
        */
       const { data } = await createAdminClient()
         .from('course_modules')
-        .select('id,title_ar,title_en,description_ar,description_en,video_link,video_source,bunny_video_id,checklist_file_url,thumbnail_url,block,status,duration_minutes,is_free_preview,order_index')
+        .select('id,title_ar,title_en,description_ar,description_en,video_link,video_source,bunny_video_id,checklist_file_url,thumbnail_url,block,status,duration_minutes,is_free_preview,order_index,tier_ids')
         .order('order_index');
       return (data ?? []) as CourseModule[];
     }, []),
