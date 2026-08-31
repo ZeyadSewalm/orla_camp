@@ -4,16 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import {
-  Check,
-  CheckCircle2,
+  CheckSquare,
   ChevronDown,
   ChevronLeft,
-  Circle,
-  Clock3,
+  ChevronRight,
   Download,
   Lock,
   PartyPopper,
-  PlayCircle
+  Play,
+  PlayCircle,
+  Square
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import VideoEmbed from '@/components/VideoEmbed';
@@ -72,6 +72,7 @@ export default function CoursePlayer({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [justDoneId, setJustDoneId] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const mainRef = useRef<HTMLDivElement | null>(null);
   const pendingAdvanceId = useRef<string | null>(null);
   const advancedOnceRef = useRef<Set<string>>(new Set());
@@ -217,7 +218,17 @@ export default function CoursePlayer({
   const lecturesLabel = `${totalCount} ${totalCount === 1 ? t('lecture') : t('lectures')}`;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_23rem] lg:items-start lg:gap-8">
+    /*
+     * dir="ltr" HERE ON PURPOSE.
+     *
+     * Udemy's own course player keeps video-left / curriculum-right even for
+     * Arabic courses — the player chrome doesn't mirror, only the lesson text
+     * inside it does (Arabic still shapes and reads right-to-left on its own,
+     * that's Unicode bidi, not this attribute). Forcing ltr just on this grid
+     * pins the two panes to that same fixed arrangement instead of the RTL
+     * auto-mirroring the rest of the site correctly uses everywhere else.
+     */
+    <div dir="ltr" className={`grid gap-6 lg:items-start lg:gap-8 ${sidebarOpen ? 'lg:grid-cols-[1fr_23rem]' : 'lg:grid-cols-[1fr_auto]'}`}>
       {/* ---------------------------------------------------------------- */}
       {/* MAIN: active lesson                                              */}
       {/* ---------------------------------------------------------------- */}
@@ -268,7 +279,7 @@ export default function CoursePlayer({
                 onClick={() => selectLesson(lessons[activeIndex - 1])}
                 className="mt-3 inline-flex items-center gap-1 text-xs text-steel transition hover:text-ink"
               >
-                <ChevronLeft aria-hidden className="h-3.5 w-3.5 rtl:rotate-180" />
+                <ChevronLeft aria-hidden className="h-3.5 w-3.5" />
                 <span className="truncate">{lessons[activeIndex - 1].title}</span>
               </button>
             )}
@@ -297,9 +308,9 @@ export default function CoursePlayer({
                     } ${justDoneId === active.id ? 'celebrate' : ''}`}
                   >
                     {completedMap[active.id] ? (
-                      <Check aria-hidden className={`h-4 w-4 ${justDoneId === active.id ? 'check-pop' : ''}`} strokeWidth={2.5} />
+                      <CheckSquare aria-hidden className={`h-4 w-4 ${justDoneId === active.id ? 'check-pop' : ''}`} strokeWidth={2} />
                     ) : (
-                      <Circle aria-hidden className="h-4 w-4" strokeWidth={1.5} />
+                      <Square aria-hidden className="h-4 w-4" strokeWidth={1.5} />
                     )}
                     {completedMap[active.id] ? t('markedDone') : t('markDone')}
                   </button>
@@ -365,12 +376,33 @@ export default function CoursePlayer({
       {/* ---------------------------------------------------------------- */}
       {/* SIDEBAR: curriculum                                              */}
       {/* ---------------------------------------------------------------- */}
-      <aside className="lg:sticky lg:top-6">
+      {!sidebarOpen && (
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(true)}
+          aria-label={t('showSidebar')}
+          className="hidden h-11 w-11 shrink-0 items-center justify-center self-start rounded-full border border-ink/10 bg-white text-steel shadow-sm transition hover:text-ink lg:sticky lg:top-6 lg:flex"
+        >
+          <ChevronLeft aria-hidden className="h-4 w-4" />
+        </button>
+      )}
+
+      <aside className={`lg:sticky lg:top-6 ${sidebarOpen ? '' : 'hidden lg:hidden'}`}>
         <div className="overflow-hidden rounded-[1.75rem] border border-ink/10 bg-white soft-shadow">
           <div className="border-b border-ink/10 p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-display text-sm font-black sm:text-base">{t('courseContent')}</h3>
-              <span className="figure shrink-0 text-xs text-steel">{t('sectionProgress', { done: doneCount, total: totalCount })}</span>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="figure text-xs text-steel">{t('sectionProgress', { done: doneCount, total: totalCount })}</span>
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(false)}
+                  aria-label={t('hideSidebar')}
+                  className="hidden h-6 w-6 items-center justify-center rounded-full text-steel transition hover:bg-ink/5 hover:text-ink lg:inline-flex"
+                >
+                  <ChevronRight aria-hidden className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <p className="mt-1 text-[0.7rem] text-steel">
               {lecturesLabel}
@@ -429,38 +461,48 @@ export default function CoursePlayer({
                               onClick={() => selectLesson(lesson)}
                               aria-disabled={!lesson.unlocked}
                               aria-current={isActive ? 'true' : undefined}
-                              className={`flex w-full items-start gap-3 px-4 py-3 text-start transition sm:px-5 ${
+                              className={`flex w-full items-start gap-3 px-4 py-3 text-left transition sm:px-5 ${
                                 isActive ? 'bg-brass/[0.07]' : lesson.unlocked ? 'hover:bg-ink/[0.025]' : 'opacity-60 hover:bg-ink/[0.015]'
-                              } ${isActive ? 'border-s-2 border-brass' : 'border-s-2 border-transparent'}`}
+                              } ${isActive ? 'border-l-2 border-brass' : 'border-l-2 border-transparent'}`}
                             >
                               <span className="mt-0.5 shrink-0">
                                 {!lesson.unlocked ? (
                                   <Lock aria-hidden className="h-4 w-4 text-steel" />
                                 ) : done ? (
-                                  <CheckCircle2 aria-hidden className={`h-4 w-4 text-brass ${justDoneId === lesson.id ? 'check-pop' : ''}`} />
-                                ) : isActive ? (
-                                  <PlayCircle aria-hidden className="h-4 w-4 text-brass" />
-                                ) : inProgress ? (
-                                  <Circle aria-hidden className="h-4 w-4 text-brass" strokeWidth={2} />
+                                  <CheckSquare aria-hidden className={`h-4 w-4 text-brass ${justDoneId === lesson.id ? 'check-pop' : ''}`} strokeWidth={2} />
                                 ) : (
-                                  <Circle aria-hidden className="h-4 w-4 text-line" strokeWidth={1.5} />
+                                  <Square aria-hidden className={`h-4 w-4 ${inProgress ? 'text-brass' : 'text-line'}`} strokeWidth={inProgress ? 2 : 1.5} />
                                 )}
                               </span>
                               <span className="min-w-0 flex-1">
                                 <span className={`block truncate text-sm ${isActive ? 'font-semibold text-ink' : done ? 'text-steel' : 'text-ink'}`}>
                                   {lesson.index}. {lesson.title}
                                 </span>
-                                <span className="mt-0.5 flex items-center gap-2 text-[0.7rem] text-steel">
-                                  {duration && (
-                                    <span className="inline-flex items-center gap-1">
-                                      <Clock3 aria-hidden className="h-3 w-3" />
-                                      {duration}
-                                    </span>
-                                  )}
-                                  {lesson.isFreePreview && (
-                                    <span className="rounded-full bg-brass/10 px-1.5 py-0.5 font-semibold text-brass">
-                                      {t('freePreview')}
-                                    </span>
+                                <span className="mt-0.5 flex items-center justify-between gap-2">
+                                  <span className="flex items-center gap-2 text-[0.7rem] text-steel">
+                                    {duration && (
+                                      <span className="inline-flex items-center gap-1">
+                                        <Play aria-hidden className="h-3 w-3" strokeWidth={1.5} />
+                                        {duration}
+                                      </span>
+                                    )}
+                                    {lesson.isFreePreview && (
+                                      <span className="rounded-full bg-brass/10 px-1.5 py-0.5 font-semibold text-brass">
+                                        {t('freePreview')}
+                                      </span>
+                                    )}
+                                  </span>
+                                  {lesson.unlocked && lesson.checklistUrl && (
+                                    <a
+                                      href={lesson.checklistUrl}
+                                      target="_blank"
+                                      rel="noopener"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ink/10 px-2 py-0.5 text-[0.65rem] text-steel transition hover:border-ink/30 hover:text-ink"
+                                    >
+                                      <Download aria-hidden className="h-3 w-3" />
+                                      {t('resources')}
+                                    </a>
                                   )}
                                 </span>
                               </span>

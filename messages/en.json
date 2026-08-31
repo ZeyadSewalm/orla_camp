@@ -167,7 +167,10 @@
     "sectionProgress": "{done} / {total}",
     "collapseSection": "Collapse section",
     "expandSection": "Expand section",
-    "generalSection": "Course content"
+    "generalSection": "Course content",
+    "resources": "Resources",
+    "hideSidebar": "Hide course content",
+    "showSidebar": "Show course content"
   },
   "community": {
     "title": "Community",

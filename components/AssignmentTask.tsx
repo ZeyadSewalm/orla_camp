@@ -318,7 +318,6 @@ export default function AssignmentTask({
               {latestSubmission?.status === 'needs_revision' ? <RotateCcw aria-hidden className="h-4 w-4" /> : <FileUp aria-hidden className="h-4 w-4" />}
               {latestSubmission ? (ar ? 'رفع نسخة معدلة' : 'Upload revision') : (ar ? 'رفع ملف STL' : 'Upload STL')}
             </label>
-            <span className="text-xs text-steel">{ar ? 'الملف يذهب إلى Drive مباشرة، وليس إلى سيرفر الموقع.' : 'The file goes directly to Drive, not through the website server.'}</span>
           </div>
         ) : (
           <p className="text-sm text-steel">{ar ? 'لا توجد إعادة تسليم متاحة لهذه المهمة.' : 'Resubmission is not available for this task.'}</p>

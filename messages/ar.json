@@ -167,7 +167,10 @@
     "sectionProgress": "{done} من {total}",
     "collapseSection": "طيّ القسم",
     "expandSection": "فتح القسم",
-    "generalSection": "محتوى الكورس"
+    "generalSection": "محتوى الكورس",
+    "resources": "الملفات",
+    "hideSidebar": "إخفاء قائمة الدروس",
+    "showSidebar": "إظهار قائمة الدروس"
   },
   "community": {
     "title": "المجتمع",
