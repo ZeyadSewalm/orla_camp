@@ -53,10 +53,14 @@ export default async function Profile({ params: { locale } }: { params: { locale
    * percentage they can never move past — a progress bar that punishes them
    * for the tier they bought.
    */
-  const [{ data: moduleRows }, { data: progressRows }, { data: submissionRows }, { data: assignmentRows }, { data: rankRows }] =
+  /*
+   * getStudentOverview() above already fetched modules and lesson_progress for
+   * the dashboard. Fetching them a second time here — which is what happened
+   * while this page had its own progress bar — meant two extra round trips on
+   * every profile view to render numbers that were already on screen.
+   */
+  const [{ data: submissionRows }, { data: assignmentRows }, { data: rankRows }] =
     await Promise.all([
-      supabase.from('course_modules').select('id,title_ar,title_en,order_index,tier_ids').order('order_index'),
-      supabase.from('lesson_progress').select('module_id,is_completed,watch_seconds,completed_at').eq('user_id', me.id),
       supabase
         .from('assignment_submissions')
         .select('id,assignment_id,attempt_number,status,grade,score_breakdown,admin_feedback,submitted_at,graded_at,original_filename')
@@ -66,17 +70,6 @@ export default async function Profile({ params: { locale } }: { params: { locale
       supabase.from('assignments').select('id,lesson_id,title_ar,title_en,max_score'),
       supabase.rpc('my_leaderboard_rank')
     ]);
-
-  const modules = (moduleRows ?? []) as any[];
-  const myTierId = me.tier_id ?? null;
-  const visibleModules = modules.filter(
-    (m) => !m.tier_ids?.length || (myTierId && m.tier_ids.includes(myTierId))
-  );
-
-  const progressByModule = new Map((progressRows ?? []).map((row: any) => [row.module_id, row]));
-  const completed = visibleModules.filter((m) => progressByModule.get(m.id)?.is_completed).length;
-  const started = visibleModules.filter((m) => progressByModule.has(m.id)).length;
-  const pct = visibleModules.length ? Math.round((completed / visibleModules.length) * 100) : 0;
 
   const assignments = (assignmentRows ?? []) as any[];
   const assignmentById = new Map(assignments.map((a) => [a.id, a]));
@@ -99,6 +92,14 @@ export default async function Profile({ params: { locale } }: { params: { locale
   const average = bestScores.length
     ? Math.round((bestScores.reduce((a, b) => a + b, 0) / bestScores.length) * 10) / 10
     : null;
+
+  /*
+   * Graded attempts, newest first. Deliberately every attempt rather than the
+   * best one: the best score is what the leaderboard ranks on, but a student
+   * looking at their own record should be able to see the improvement between
+   * attempt 1 and attempt 3 — that progression is the useful part.
+   */
+  const gradedList = submissions.filter((s) => s.status === 'graded' && s.grade !== null);
 
   const rank = (rankRows as any[])?.[0] ?? null;
   const awaiting = submissions.filter((s) => s.status === 'submitted' || s.status === 'under_review' || s.status === 'resubmitted').length;
@@ -124,43 +125,22 @@ export default async function Profile({ params: { locale } }: { params: { locale
         />
       )}
 
-      <header className="mt-14 flex flex-wrap items-end justify-between gap-4 border-t border-ink/10 pt-10">
-        <div>
-          <h1 className="font-display text-3xl font-black">{t('title')}</h1>
-          <p className="mt-1 text-sm text-steel">{me.full_name || me.email}</p>
-        </div>
-        <Link href={lh(locale, '/course')} className="btn-quiet text-xs">{t('backToCourse')}</Link>
-      </header>
-
-      {/* ---------- PROGRESS ---------- */}
-      <section className="surface-card mt-10 p-6 md:p-8">
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="font-display text-lg font-black">{t('progressTitle')}</h2>
-          <span className="figure text-sm text-steel">
-            {completed} / {visibleModules.length} {t('lessons')}
-          </span>
-        </div>
-
-        <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-ink/10">
-          <div
-            className="h-full rounded-full bg-brass transition-[width] duration-700"
-            style={{ width: `${pct}%` }}
-            role="progressbar"
-            aria-valuenow={pct}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          />
-        </div>
-
-        <dl className="mt-6 grid gap-4 sm:grid-cols-3">
-          <Stat label={t('statComplete')} value={`${pct}%`} />
-          <Stat label={t('statStarted')} value={String(started)} />
-          <Stat label={t('statAverage')} value={average === null ? '—' : String(average)} />
-        </dl>
-      </section>
+      {/*
+        * NO SECOND PROGRESS CARD, AND NO SECOND NAME.
+        *
+        * StudentDashboard above already renders the welcome banner (name,
+        * email, avatar), the completion percentage — twice, in the ring and
+        * the continue card — the progress bar, completed/remaining counts and
+        * total watch time. Repeating any of it here was the same numbers
+        * printed a second time a few hundred pixels lower.
+        *
+        * What follows is only what the dashboard does NOT cover: the average
+        * grade, the leaderboard standing, and the per-criterion detail behind
+        * each graded case.
+        */}
 
       {/* ---------- STANDING ---------- */}
-      <section className="surface-card mt-6 p-6 md:p-8">
+      <section className="surface-card mt-14 p-6 md:p-8">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h2 className="font-display text-lg font-black">{t('standingTitle')}</h2>
           <Link href={lh(locale, '/leaderboard')} className="text-sm text-brass underline">
@@ -174,6 +154,15 @@ export default async function Profile({ params: { locale } }: { params: { locale
             : t('rankNone')}
         </p>
 
+        {/* The average IS new — the dashboard counts lessons and watch time but
+            never grades. Shown here beside the rank it feeds into. */}
+        {average !== null && (
+          <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+            <Stat label={t('statAverage')} value={String(average)} />
+            <Stat label={t('statCasesGraded')} value={String(bestScores.length)} />
+          </dl>
+        )}
+
         {/* The opt-out lives here, next to the rank it controls, rather than
             buried in a settings page the student would have to go looking for. */}
         <div className="mt-5 border-t border-ink/10 pt-5">
@@ -181,23 +170,33 @@ export default async function Profile({ params: { locale } }: { params: { locale
         </div>
       </section>
 
-      {/* ---------- CASE FILES ---------- */}
+      {/* ---------- SCORE DETAIL ----------
+        *
+        * NOT a second list of case files. The STL Tasks grid in the dashboard
+        * above already shows one card per assignment: title, current status,
+        * grade and a clipped feedback line. Repeating that here was the same
+        * information twice.
+        *
+        * This section answers the question the grid cannot: HOW was each grade
+        * arrived at. So it shows graded attempts only — every attempt, not just
+        * the latest — with the per-criterion breakdown and the reviewer's note
+        * in full.
+        */}
       <section className="mt-10">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="font-display text-lg font-black">{t('casesTitle')}</h2>
+          <h2 className="font-display text-lg font-black">{t('scoresTitle')}</h2>
           {awaiting > 0 && (
             <span className="text-xs text-steel">{t('awaiting', { count: awaiting })}</span>
           )}
         </div>
 
-        {submissions.length === 0 ? (
-          <p className="surface-card mt-4 p-6 text-sm text-steel">{t('noCases')}</p>
+        {gradedList.length === 0 ? (
+          <p className="surface-card mt-4 p-6 text-sm text-steel">{t('noScores')}</p>
         ) : (
           <ol className="mt-4 space-y-3">
-            {submissions.map((sub) => {
+            {gradedList.map((sub) => {
               const assignment = assignmentById.get(sub.assignment_id);
               const breakdown = parseBreakdown(sub.score_breakdown);
-              const isGraded = sub.status === 'graded' && sub.grade !== null;
 
               return (
                 <li key={sub.id} className="surface-card p-5">
@@ -210,22 +209,16 @@ export default async function Profile({ params: { locale } }: { params: { locale
                         </span>
                       )}
                     </p>
-                    {isGraded ? (
-                      <span className="figure font-display text-lg font-bold text-brass">
-                        {Number(sub.grade)}
-                        <span className="text-sm font-normal text-steel"> / {assignment?.max_score ?? 100}</span>
-                      </span>
-                    ) : (
-                      <span className="text-xs uppercase tracking-[0.12em] text-steel">
-                        {t(`status_${sub.status}` as 'status_submitted')}
-                      </span>
-                    )}
+                    <span className="figure font-display text-lg font-bold text-brass">
+                      {Number(sub.grade)}
+                      <span className="text-sm font-normal text-steel"> / {assignment?.max_score ?? 100}</span>
+                    </span>
                   </div>
 
                   {/* Sub-scores. Only rendered when the reviewer actually filled
                       them in — older submissions have a grade and no detail, and
                       an empty grid of dashes would look like missing data. */}
-                  {isGraded && breakdown && (
+                  {breakdown && (
                     <ul className="mt-4 grid gap-2.5 border-t border-ink/10 pt-4 sm:grid-cols-2">
                       {CRITERIA.filter((c) => breakdown[c.id] !== undefined).map((c) => {
                         const value = breakdown[c.id];

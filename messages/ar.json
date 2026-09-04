@@ -146,8 +146,6 @@
     "lectures": "دروس",
     "min": "د",
     "hourShort": "س ",
-    "lockedLesson": "هذا الدرس مقفل",
-    "lockedHint": "أكمل «{previous}» وسلّم مهمته لفتح هذا الدرس",
     "tierLockedLesson": "هذا الدرس مش ضمن باقتك الحالية",
     "tierLockedHint": "رقّي باقتك عشان تفتح هذا المحتوى",
     "viewPlans": "شوف الباقات",
@@ -312,26 +310,16 @@
     "dashboardLabel": "لوحة الطالب"
   },
   "profile": {
-    "title": "ملفي",
-    "backToCourse": "العودة إلى الدورة",
-    "progressTitle": "تقدّمك في الدورة",
-    "lessons": "درساً",
-    "statComplete": "مكتمل",
-    "statStarted": "بدأتها",
     "statAverage": "متوسط الدرجات",
     "standingTitle": "ترتيبك",
     "viewLeaderboard": "عرض لوحة الصدارة",
     "rankLine": "ترتيبك {rank} من {total} طالباً على اللوحة.",
     "rankNone": "ستظهر في لوحة الصدارة بمجرد إكمالك درساً أو تقييم أول ملف حالة لك.",
-    "casesTitle": "ملفات حالاتي",
     "awaiting": "{count} قيد المراجعة",
-    "noCases": "لم ترفع أي ملف حالة بعد. ارفع واحداً من أي درس فيه مهمة.",
     "attempt": "المحاولة {n}",
-    "status_submitted": "مُسلَّم",
-    "status_under_review": "قيد المراجعة",
-    "status_resubmitted": "أُعيد تسليمه",
-    "status_needs_revision": "يحتاج تعديلاً",
-    "status_graded": "مُقيَّم"
+    "scoresTitle": "كيف قُيِّمت حالاتك",
+    "noScores": "لا توجد حالات مقيَّمة بعد. بمجرد تقييم أول ملف حالة سيظهر تفصيل الدرجة هنا كاملاً.",
+    "statCasesGraded": "حالات مقيَّمة"
   },
   "leaderboard": {
     "title": "لوحة الصدارة",

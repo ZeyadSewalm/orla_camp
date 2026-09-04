@@ -146,8 +146,6 @@
     "lectures": "lectures",
     "min": "min",
     "hourShort": "h ",
-    "lockedLesson": "This lesson is locked",
-    "lockedHint": "Finish “{previous}” and submit its task to unlock this lesson",
     "tierLockedLesson": "This lesson isn't included in your current plan",
     "tierLockedHint": "Upgrade your plan to unlock this content",
     "viewPlans": "View plans",
@@ -312,26 +310,16 @@
     "dashboardLabel": "Student dashboard"
   },
   "profile": {
-    "title": "My profile",
-    "backToCourse": "Back to the course",
-    "progressTitle": "Course progress",
-    "lessons": "lessons",
-    "statComplete": "Complete",
-    "statStarted": "Started",
     "statAverage": "Average score",
     "standingTitle": "Where you stand",
     "viewLeaderboard": "View leaderboard",
     "rankLine": "You're #{rank} of {total} students on the board.",
     "rankNone": "You'll appear on the leaderboard once you've completed a lesson or had a case file graded.",
-    "casesTitle": "My case files",
     "awaiting": "{count} awaiting review",
-    "noCases": "No case files submitted yet. Upload one from any lesson that has a task.",
     "attempt": "attempt {n}",
-    "status_submitted": "Submitted",
-    "status_under_review": "In review",
-    "status_resubmitted": "Resubmitted",
-    "status_needs_revision": "Needs revision",
-    "status_graded": "Graded"
+    "scoresTitle": "How your cases were scored",
+    "noScores": "Nothing graded yet. Once a reviewer scores a case file, the full breakdown appears here.",
+    "statCasesGraded": "Cases graded"
   },
   "leaderboard": {
     "title": "Leaderboard",

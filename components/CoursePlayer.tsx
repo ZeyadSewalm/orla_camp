@@ -41,7 +41,6 @@ export type CourseLessonVM = {
   completed: boolean;
   watchSeconds: number;
   checklistUrl: string | null;
-  previousTitle: string | null;
   assignments: Assignment[];
   submissionsByAssignment: Record<string, AssignmentSubmission | null>;
 };
@@ -353,21 +352,18 @@ export default function CoursePlayer({
           {!active.unlocked ? (
             <div className="-mx-4 flex aspect-[4/3] w-[calc(100%+2rem)] flex-col items-center justify-center gap-3 bg-paper px-6 text-center sm:mx-0 sm:aspect-video sm:w-full sm:rounded-t-[2rem]">
               <Lock aria-hidden className="h-7 w-7 text-steel" />
-              <p className="text-sm font-semibold">{active.tierBlocked ? t('tierLockedLesson') : t('lockedLesson')}</p>
-              {active.tierBlocked ? (
-                <>
-                  <p className="max-w-sm text-xs leading-relaxed text-steel">{t('tierLockedHint')}</p>
-                  <Link href={lh(locale, '/pricing')} className="btn-quiet text-xs">
-                    {t('viewPlans')}
-                  </Link>
-                </>
-              ) : (
-                active.previousTitle && (
-                  <p className="max-w-sm text-xs leading-relaxed text-steel">
-                    {t('lockedHint', { previous: active.previousTitle })}
-                  </p>
-                )
-              )}
+              {/*
+                * The ONLY reason a lesson is locked now is the student's tier.
+                * Sequential unlocking is gone, so the old "finish the lesson
+                * before this one" message can no longer be true — showing it
+                * would send a student to complete a prerequisite that does not
+                * exist, with no way to clear it.
+                */}
+              <p className="text-sm font-semibold">{t('tierLockedLesson')}</p>
+              <p className="max-w-sm text-xs leading-relaxed text-steel">{t('tierLockedHint')}</p>
+              <Link href={lh(locale, '/pricing')} className="btn-quiet text-xs">
+                {t('viewPlans')}
+              </Link>
             </div>
           ) : (
             <div className="-mx-4 w-[calc(100%+2rem)] sm:mx-0 sm:w-full">

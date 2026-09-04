@@ -105,20 +105,6 @@ export default async function Course({ params: { locale } }: { params: { locale:
   const ar = locale === 'ar';
   const isStaff = profile.role === 'admin' || profile.role === 'reviewer';
 
-  /**
-   * A lesson counts as finished when it is marked complete AND every active
-   * task on it has been submitted. A task still in `uploading` or `failed` has
-   * not been submitted — the file never arrived.
-   */
-  function lessonFinished(moduleId: string) {
-    if (!(progressByModule.get(moduleId)?.is_completed ?? false)) return false;
-    const tasks = assignmentsByLesson.get(moduleId) ?? [];
-    return tasks.every((task) => {
-      const sub = latestTaskSubmissionByAssignment.get(task.id);
-      return !!sub && !['uploading', 'failed'].includes(sub.status);
-    });
-  }
-
   /*
    * PACKAGE (TIER) GATING.
    *
@@ -137,22 +123,26 @@ export default async function Course({ params: { locale } }: { params: { locale:
   // lesson" for the ones on either side of it, and never unlocks no matter
   // what they complete.
   const visibleModules = modules.filter((m) => tierAllowed(m));
-  const unlockedModuleIds = new Set<string>();
-  const previousVisibleTitleByModuleId = new Map<string, string | null>();
-  for (let i = 0; i < visibleModules.length; i += 1) {
-    const current = visibleModules[i];
-    // The first lesson is always open, and so is anything already started —
-    // nobody who has begun a lesson should ever find it locked behind them.
-    const previous = i === 0 ? null : visibleModules[i - 1];
-    previousVisibleTitleByModuleId.set(current.id, previous ? (ar ? previous.title_ar : previous.title_en) : null);
-    const open =
-      isStaff ||
-      i === 0 ||
-      current.is_free_preview ||
-      progressByModule.has(current.id) ||
-      (previous ? lessonFinished(previous.id) : true);
-    if (open) unlockedModuleIds.add(current.id);
-  }
+  /*
+   * NO SEQUENTIAL LOCKING.
+   *
+   * Lessons used to unlock one at a time: a lesson opened only once the one
+   * before it was finished and its task submitted. That is gone — every lesson
+   * the student's tier includes is open from day one, in any order.
+   *
+   * WHAT THIS DOES NOT CHANGE
+   *
+   * `visibleModules` is still the tier filter, and it still decides what goes
+   * in this set. Sequencing was a teaching preference; the tier is the thing
+   * the student paid for, and it stays enforced here AND in RLS. Removing the
+   * order lock must not become a way to reach content from a higher tier.
+   *
+   * The old rule was also weaker than it looked: `record_lesson_watch` is
+   * callable on any module id, so a determined student could create a progress
+   * row and open a lesson early. Ordering was never a real boundary — the tier
+   * always was.
+   */
+  const unlockedModuleIds = new Set(visibleModules.map((m) => m.id));
 
   /*
    * The identity fields and the activity feed that used to be built here
@@ -186,7 +176,6 @@ export default async function Course({ params: { locale } }: { params: { locale:
       completed: progressRow?.is_completed ?? false,
       watchSeconds: progressRow?.watch_seconds ?? 0,
       checklistUrl: unlocked ? m.checklist_file_url : null,
-      previousTitle: previousVisibleTitleByModuleId.get(m.id) ?? null,
       assignments: unlocked ? assignmentsByLesson.get(m.id) ?? [] : [],
       submissionsByAssignment: unlocked
         ? Object.fromEntries(
