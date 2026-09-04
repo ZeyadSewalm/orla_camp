@@ -28,6 +28,8 @@ export interface Profile {
   region: Region;
   tier_id: string | null;
   has_access: boolean;
+  /** Student-controlled leaderboard opt-out. Absent on rows read before migration 015. */
+  show_on_leaderboard?: boolean;
   role: 'user' | 'reviewer' | 'admin';
   created_at: string;
 }

@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { getProfile, requireAdmin } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { bunnyGuidFrom } from '@/lib/bunny';
+import { CRITERIA } from '@/lib/scoring';
 
 async function guard() {
   const admin = await requireAdmin();
@@ -315,8 +316,40 @@ export async function reviewAssignmentSubmission(formData: FormData) {
     .maybeSingle();
   if (!assignment) throw new Error('assignment not found');
 
+  /*
+   * PER-CRITERION BREAKDOWN.
+   *
+   * Optional throughout. A reviewer who wants to type one number still can —
+   * the breakdown inputs can all be left blank — and every submission graded
+   * before this existed keeps its bare grade. `grade` stays authoritative;
+   * the breakdown is supporting detail shown to the student.
+   *
+   * Each criterion is validated against its OWN maximum, not the assignment's.
+   * Without that a reviewer could type 90 into a field worth 30 points and the
+   * parts would silently disagree with the total the student is shown.
+   */
+  const breakdown: Record<string, number> = {};
+  for (const criterion of CRITERIA) {
+    const raw = num(formData.get(`breakdown_${criterion.id}`));
+    if (raw === null) continue;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0 || value > criterion.max) {
+      throw new Error(`${criterion.en}: score must be between 0 and ${criterion.max}`);
+    }
+    breakdown[criterion.id] = value;
+  }
+  const hasBreakdown = Object.keys(breakdown).length > 0;
+
   const rawGrade = num(formData.get('grade'));
-  const grade = rawGrade === null ? null : Number(rawGrade);
+  /*
+   * If the reviewer filled the breakdown but left the total blank, the total is
+   * the sum of the parts. Doing that here rather than in the browser means it
+   * still holds if JavaScript never runs.
+   */
+  const grade = rawGrade === null
+    ? (hasBreakdown ? Object.values(breakdown).reduce((a, b) => a + b, 0) : null)
+    : Number(rawGrade);
+
   const maxScore = Number(assignment.max_score);
   if (grade !== null && (!Number.isFinite(grade) || grade < 0 || grade > maxScore)) {
     throw new Error('grade out of range');
@@ -327,6 +360,9 @@ export async function reviewAssignmentSubmission(formData: FormData) {
   await db.from('assignment_submissions').update({
     status,
     grade: status === 'graded' ? grade : null,
+    // Cleared alongside the grade: a submission sent back for revision must not
+    // keep showing the student the sub-scores of a grade it no longer has.
+    score_breakdown: status === 'graded' && hasBreakdown ? breakdown : null,
     admin_feedback: str(formData.get('admin_feedback')),
     graded_at: status === 'graded' ? now : null,
     graded_by: me.id,

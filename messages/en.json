@@ -10,7 +10,8 @@
     "login": "Log in",
     "signup": "Create account",
     "logout": "Log out",
-    "menu": "Menu"
+    "menu": "Menu",
+    "profile": "Profile"
   },
   "home": {
     "kicker": "Built by the design team behind OrlaDent",
@@ -309,5 +310,38 @@
     "readyToLearn": "Ready to keep learning?",
     "studentFallback": "Student",
     "dashboardLabel": "Student dashboard"
+  },
+  "profile": {
+    "title": "My profile",
+    "backToCourse": "Back to the course",
+    "progressTitle": "Course progress",
+    "lessons": "lessons",
+    "statComplete": "Complete",
+    "statStarted": "Started",
+    "statAverage": "Average score",
+    "standingTitle": "Where you stand",
+    "viewLeaderboard": "View leaderboard",
+    "rankLine": "You're #{rank} of {total} students on the board.",
+    "rankNone": "You'll appear on the leaderboard once you've completed a lesson or had a case file graded.",
+    "casesTitle": "My case files",
+    "awaiting": "{count} awaiting review",
+    "noCases": "No case files submitted yet. Upload one from any lesson that has a task.",
+    "attempt": "attempt {n}",
+    "status_submitted": "Submitted",
+    "status_under_review": "In review",
+    "status_resubmitted": "Resubmitted",
+    "status_needs_revision": "Needs revision",
+    "status_graded": "Graded"
+  },
+  "leaderboard": {
+    "title": "Leaderboard",
+    "subtitle": "Ranked by completed work and the quality of it. Ten points a graded case, plus your average score.",
+    "backToProfile": "Back to my profile",
+    "you": "you",
+    "empty": "Nobody's on the board yet. Complete a lesson or submit a case file to be the first.",
+    "youAreHidden": "You've chosen not to appear on the leaderboard, so you won't find yourself in this list. You can change that from your profile.",
+    "rowSummary": "{lessons} lessons · {cases} cases graded",
+    "avg": "avg",
+    "howItWorks": "Only your best attempt on each case counts, so resubmitting can only help you. Students who've opted out aren't listed."
   }
 }

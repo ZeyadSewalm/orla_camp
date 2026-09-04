@@ -10,6 +10,7 @@ import {
 } from '@/components/admin/Shell';
 import CaseFileLink from '@/components/admin/CaseFileLink';
 import SubmitButton, { SubmitLink } from '@/components/SubmitButton';
+import { CRITERIA, parseBreakdown } from '@/lib/scoring';
 import { Users, Wallet, ClipboardCheck, Coins } from 'lucide-react';
 import BunnyUpload from '@/components/admin/BunnyUpload';
 import { isBunnyConfigured, bunnyLibraryFrom } from '@/lib/bunny';
@@ -430,6 +431,8 @@ async function Tasks({
   const pending = rows.filter((row: any) => ['submitted', 'resubmitted', 'under_review'].includes(row.status));
   const selected = rows.find((row: any) => row.id === submissionId) ?? pending[pending.length - 1] ?? rows[0] ?? null;
   const selectedAssignment = selected ? assignmentById.get(selected.assignment_id) : null;
+  // Prefills the criterion inputs when re-opening an already-graded submission.
+  const selectedBreakdown = selected ? parseBreakdown(selected.score_breakdown) : null;
   const selectedModule = selectedAssignment ? moduleById.get(selectedAssignment.lesson_id) : null;
   const selectedProfile = selected ? profileById.get(selected.user_id) : null;
 
@@ -628,9 +631,43 @@ async function Tasks({
                         <option value="needs_revision">{labels.revision}</option>
                       </select>
                     </Field>
-                    <Field label={`${labels.grade} / ${selectedAssignment.max_score}`}>
+                    <Field label={`${labels.grade} / ${selectedAssignment.max_score}`} hint={ar ? 'اتركها فارغة ليُحسب المجموع من التفصيل أدناه.' : 'Leave blank to total the breakdown below.'}>
                       <input name="grade" type="number" min="0" max={Number(selectedAssignment.max_score)} step="0.5" defaultValue={selected.grade ?? ''} className="field" />
                     </Field>
+                    {/*
+                      * Per-criterion scoring. Every field is optional: a
+                      * reviewer who prefers one number just fills the total
+                      * above and leaves these blank. Fill them and leave the
+                      * total blank, and the server sums them.
+                      *
+                      * Each input is capped at its own criterion's max, so the
+                      * parts can never quietly exceed the whole.
+                      */}
+                    <div className="sm:col-span-2">
+                      <p className="label mb-3">
+                        {ar ? 'تفصيل الدرجة (اختياري)' : 'Score breakdown (optional)'}
+                      </p>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {CRITERIA.map((criterion) => (
+                          <Field
+                            key={criterion.id}
+                            label={`${ar ? criterion.ar : criterion.en} / ${criterion.max}`}
+                            hint={ar ? criterion.hintAr : criterion.hintEn}
+                          >
+                            <input
+                              name={`breakdown_${criterion.id}`}
+                              type="number"
+                              min="0"
+                              max={criterion.max}
+                              step="0.5"
+                              defaultValue={selectedBreakdown?.[criterion.id] ?? ''}
+                              className="field"
+                            />
+                          </Field>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="sm:col-span-2">
                       <Field label={labels.feedback}><textarea name="admin_feedback" rows={7} defaultValue={selected.admin_feedback ?? ''} className="field" /></Field>
                     </div>

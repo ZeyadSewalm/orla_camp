@@ -17,7 +17,10 @@ const intlMiddleware = createIntlMiddleware({
   localeCookie: { name: LOCALE_COOKIE, maxAge: LOCALE_COOKIE_MAX_AGE, sameSite: 'lax' }
 });
 
-const PROTECTED = ['/course', '/admin', '/community', '/live-sessions', '/checkout'];
+// /profile and /leaderboard both show student performance data — one
+// person's own, one the cohort's. Each page checks access itself too, but
+// this is the first gate and it fails closed.
+const PROTECTED = ['/course', '/admin', '/community', '/live-sessions', '/checkout', '/profile', '/leaderboard'];
 
 /**
  * Reads the access token's expiry straight out of the cookie, with no network

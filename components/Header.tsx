@@ -19,7 +19,9 @@ export default async function Header({ locale }: { locale: string }) {
     ['/pricing', t('pricing')],
     ['/faq', t('faq')]
   ];
-  if (profile?.has_access) links.unshift(['/course', t('course')], ['/live-sessions', t('live')], ['/community', t('community')]);
+  // Profile sits last of the student links: it is where you go to review what
+  // you have done, not where the work happens.
+  if (profile?.has_access) links.unshift(['/course', t('course')], ['/live-sessions', t('live')], ['/community', t('community')], ['/profile', t('profile')]);
   if (profile?.role === 'admin' || profile?.role === 'reviewer') links.push(['/admin', t('admin')]);
 
   return (
