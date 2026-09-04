@@ -26,7 +26,7 @@ export default function TierComparison({
 }: {
   tiers: Tier[];
   locale: string;
-  labels: { egypt: string; intl: string; custom: string; installments: string };
+  labels: { egypt: string; custom: string; bestValue: string };
 }) {
   const ar = locale === 'ar';
   const order = ['foundation', 'freelance_ready', 'production_partner'];
@@ -48,18 +48,13 @@ export default function TierComparison({
 
   /** Price block, shared by both layouts. */
   const priceFor = (tier: Tier, region: 'egypt' | 'international') => {
-    const { currency, full, installment, count } = tierPrice(tier, region);
+    const { currency, full } = tierPrice(tier, region);
     if (full === null) return <em className="text-sm text-steel">{labels.custom}</em>;
-    return (
-      <>
-        <span className="figure font-display text-lg font-bold">{formatMoney(full, currency, locale)}</span>
-        {tier.installments_available && installment !== null && (
-          <span className="figure block text-xs text-steel">
-            {labels.installments} {count} × {formatMoney(installment, currency, locale)}
-          </span>
-        )}
-      </>
-    );
+    // Instalments are gone, so the price is a single number again. Nothing here
+    // reads tier.installments_available any more: the DB flag is what stops
+    // checkout offering a plan, and this component must not be the only thing
+    // hiding an option the server would still accept.
+    return <span className="figure font-display text-lg font-bold">{formatMoney(full, currency, locale)}</span>;
   };
 
   const priceRow = (region: 'egypt' | 'international', label: string) => (
@@ -75,23 +70,21 @@ export default function TierComparison({
     <div className="mt-10">
       {/* ---------- MOBILE: one card per tier, nothing to scroll ---------- */}
       <div className="grid gap-4 md:hidden">
-        {cols.map((tier) => (
-          <div key={tier.id} className="surface-card p-5">
-            <h3 className="display text-lg">{ar ? tier.name_ar : tier.name_en}</h3>
-            {tier.max_seats !== null && (
-              <p className="mt-1 text-xs font-semibold text-brass">
-                {ar ? `دفعة تجريبية — ${tier.max_seats} مقاعد فقط` : `pilot — ${tier.max_seats} seats only`}
-              </p>
+        {cols.map((tier) => {
+          const best = tier.slug === 'freelance_ready';
+          return (
+          <div key={tier.id} className={`surface-card p-5 ${best ? 'ring-1 ring-brass' : ''}`}>
+            {best && (
+              <span className="mb-1.5 block text-[0.62rem] font-bold uppercase tracking-[0.16em] text-brass">
+                {labels.bestValue}
+              </span>
             )}
+            <h3 className={`display text-lg ${best ? 'text-brass' : ''}`}>{ar ? tier.name_ar : tier.name_en}</h3>
 
             <dl className="mt-4 space-y-2 border-t border-line pt-4 text-sm">
               <div className="flex items-baseline justify-between gap-4">
                 <dt className="text-steel">{labels.egypt}</dt>
                 <dd className="text-end">{priceFor(tier, 'egypt')}</dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-4">
-                <dt className="text-steel">{labels.intl}</dt>
-                <dd className="text-end">{priceFor(tier, 'international')}</dd>
               </div>
             </dl>
 
@@ -113,7 +106,8 @@ export default function TierComparison({
               })}
             </ul>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ---------- DESKTOP: the matrix, where it fits ---------- */}
@@ -122,16 +116,27 @@ export default function TierComparison({
           <thead>
             <tr className="border-b border-ink/20">
               <th className="w-2/5 py-4 text-start" />
-              {cols.map((tier) => (
-                <th key={tier.id} scope="col" className="py-4 pe-4 text-start align-bottom font-display text-base font-black">
-                  {ar ? tier.name_ar : tier.name_en}
-                  {tier.max_seats !== null && (
-                    <em className="block text-xs font-normal not-italic text-brass">
-                      {ar ? `دفعة تجريبية — ${tier.max_seats} مقاعد فقط` : `pilot — ${tier.max_seats} seats only`}
-                    </em>
-                  )}
-                </th>
-              ))}
+              {cols.map((tier) => {
+                /*
+                 * Freelance Ready is the tier we want chosen, so it is the only
+                 * one in the brand colour. Highlighting two would highlight
+                 * neither. The eyebrow sits ABOVE the name rather than beside
+                 * it so the three headings keep a common baseline — align-bottom
+                 * on the row is what makes that work without pushing the other
+                 * two columns down.
+                 */
+                const best = tier.slug === 'freelance_ready';
+                return (
+                  <th key={tier.id} scope="col" className="py-4 pe-4 text-start align-bottom font-display text-base font-black">
+                    {best && (
+                      <span className="mb-1.5 block text-[0.62rem] font-bold uppercase tracking-[0.16em] text-brass">
+                        {labels.bestValue}
+                      </span>
+                    )}
+                    <span className={best ? 'text-brass' : undefined}>{ar ? tier.name_ar : tier.name_en}</span>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -143,8 +148,10 @@ export default function TierComparison({
                 <td className="py-4 pe-4 align-top">{cell(row.partner)}</td>
               </tr>
             ))}
+            {/* Egypt only. The Gulf/International row was removed with the
+                international offer; re-adding it means restoring price_usd
+                display AND the region toggle on /pricing, not just this line. */}
             {priceRow('egypt', labels.egypt)}
-            {priceRow('international', labels.intl)}
           </tbody>
         </table>
       </div>

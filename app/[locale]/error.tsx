@@ -36,8 +36,8 @@ export default function Error({
       </h1>
 
       <p className="text-sm leading-relaxed text-steel">
-        أعد المحاولة — وإن استمرّت المشكلة فتواصل معنا وسنعالجها.
-        <span className="mt-1 block">Try again — if it keeps happening, get in touch and we&apos;ll sort it.</span>
+        أعد المحاولة، وإن استمرّت المشكلة فتواصل معنا وسنعالجها.
+        <span className="mt-1 block">Try again. If it keeps happening, get in touch and we&apos;ll sort it.</span>
       </p>
 
       <div className="flex flex-col gap-3 xs:flex-row">

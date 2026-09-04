@@ -9,11 +9,19 @@ export async function generateMetadata({ params: { locale } }: { params: { local
 export default async function Faq({ params: { locale } }: { params: { locale: string } }) {
   unstable_setRequestLocale(locale);
   const t = await getTranslations('faq');
-  // Five questions from the sales sheet. The refund question is deliberately
-  // NOT published — the sheet marks it 'do not publish without a confirmed policy'.
-  // Four questions — the certificate Q&A was removed on request. This loop
-  // still asked for q5, which next-intl treats as a missing message.
-  const items = [1, 2, 3, 4].map((n) => [t(`q${n}` as 'q1'), t(`a${n}` as 'a1')]);
+  /*
+   * Three questions now.
+   *
+   * The sales sheet had five: the refund question is deliberately unpublished
+   * (the sheet marks it 'do not publish without a confirmed policy'), the
+   * certificate one was removed on request, and the payment-plans one went
+   * with the instalment offer.
+   *
+   * Keep this range in step with the keys that exist. It has drifted before:
+   * the loop kept asking for q5 after q5 was deleted, and next-intl renders a
+   * missing message as a visible error string on the page.
+   */
+  const items = [1, 2, 3].map((n) => [t(`q${n}` as 'q1'), t(`a${n}` as 'a1')]);
 
   const schema = {
     '@context': 'https://schema.org',

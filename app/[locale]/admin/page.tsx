@@ -182,6 +182,7 @@ async function Modules({ db, t }: { db: DB; t: { save: string; add: string; del:
         <select name="video_source" defaultValue={m?.video_source ?? 'drive'} className="field">
           <option value="drive">Google Drive link</option>
           <option value="bunny">Bunny Stream (uploaded below)</option>
+          <option value="youtube">YouTube link</option>
         </select>
       </Field>
 
@@ -218,7 +219,7 @@ async function Modules({ db, t }: { db: DB; t: { save: string; add: string; del:
         )}
       </Field>
 
-      <Field label="Google Drive video link" hint="Only used when the source above is set to Drive. Share → Anyone with the link → Viewer. A Bunny link pasted here is moved to the Bunny field automatically.">
+      <Field label="Video link (Google Drive or YouTube)" hint="For Drive: Share → Anyone with the link → Viewer. For YouTube: paste any watch, youtu.be, or embed URL — it plays through youtube-nocookie so no tracking cookie is set before playback. A Bunny link pasted here is moved to the Bunny field automatically.">
         <input name="video_link" defaultValue={m?.video_link ?? ''} className="field" />
       </Field>
 
@@ -795,7 +796,7 @@ async function Requests({ db, save }: { db: DB; save: string }) {
               <input type="hidden" name="agreed_price" value={r.agreed_price ?? ''} />
               <input type="hidden" name="agreed_currency" value={r.agreed_currency ?? 'EGP'} />
               <SubmitButton className="btn-brass text-sm" pendingLabel="Granting access…">Grant access manually</SubmitButton>
-              <span className="text-xs text-steel">Takes one of the 3 seats.</span>
+              <span className="text-xs text-steel">Grants access immediately.</span>
             </form>
           )}
         </Card>

@@ -111,7 +111,7 @@ export default async function MySubmissions({ params: { locale } }: { params: { 
                 </div>
                 {row.reviewer_notes && (
                   <div className="mt-4 border-t border-line pt-4">
-                    <p className="label">{t('feedback')}{row.reviewed_by ? ` — ${row.reviewed_by}` : ''}</p>
+                    <p className="label">{t('feedback')}{row.reviewed_by ? ` · ${row.reviewed_by}` : ''}</p>
                     <p className="whitespace-pre-wrap text-sm leading-relaxed">{row.reviewer_notes}</p>
                   </div>
                 )}

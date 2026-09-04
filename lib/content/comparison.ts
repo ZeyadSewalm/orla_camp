@@ -39,6 +39,6 @@ export const COMPARISON_ROWS: ComparisonRow[] = [
     en: 'Private 1:1 mentorship with Badr',
     foundation: false,
     freelance: false,
-    partner: { ar: 'النطاق يتفق عليه فردياً — دفعة تجريبية', en: 'scope agreed individually — pilot batch' }
+    partner: { ar: 'النطاق يتفق عليه فردياً', en: 'scope agreed individually' }
   }
 ];

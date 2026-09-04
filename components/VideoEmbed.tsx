@@ -94,6 +94,19 @@ export default function VideoEmbed({
 
   const isBunny = !!src && src.includes('mediadelivery.net');
   const isDrive = !!src && src.includes('drive.google.com');
+  /*
+   * YouTube is a third source, and it behaves like neither of the others.
+   *
+   * Bunny gives us a real "ended" event over Player.js; Drive gives us nothing,
+   * so there is a watch-time heuristic for it. YouTube's iframe API is a third
+   * mechanism again, and wiring it up would mean loading Google's script on a
+   * page whose whole point is that the visitor has not agreed to be tracked.
+   *
+   * So YouTube deliberately gets the same treatment as Drive: no automatic
+   * completion event, and the manual "mark complete" affordance instead. This
+   * is only used for the free lesson, where nothing is gated on finishing it.
+   */
+  const isYouTube = !!src && (src.includes('youtube.com') || src.includes('youtube-nocookie.com'));
 
   const flush = useCallback(async () => {
     if (!moduleId || !supabase || flushing.current) return;

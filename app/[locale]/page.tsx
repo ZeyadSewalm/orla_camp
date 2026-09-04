@@ -8,12 +8,15 @@ import Curriculum from '@/components/Curriculum';
 import TierComparison from '@/components/TierComparison';
 import { getTiers } from '@/lib/data';
 import { lh } from '@/lib/href';
-import { seatsLeft } from '@/lib/pricing';
 
 /**
- * Sales page. Section order follows the sales sheet exactly:
+ * Sales page. Section order:
  * 1 Hero · 2 Problem · 3 Instructor · 4 Curriculum · 5 Tier comparison
- * 6 What's included · 7 Pricing + payment plans · 8 FAQ · 9 Final CTA
+ * 6 What's included · 7 FAQ · 8 Final CTA
+ *
+ * This no longer matches the sales sheet one-for-one: the sheet's section 7,
+ * "Pricing + payment plans", was dropped when instalments were withdrawn.
+ * Prices live on /pricing and in the comparison table in section 5.
  */
 export default async function Home({ params: { locale } }: { params: { locale: string } }) {
   unstable_setRequestLocale(locale);
@@ -26,9 +29,6 @@ export default async function Home({ params: { locale } }: { params: { locale: s
   const tiers = await getTiers();
 
   const ar = locale === 'ar';
-  const partner = tiers.find((x) => x.slug === 'production_partner');
-  const left = partner ? seatsLeft(partner) : null;
-
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'Course',
@@ -41,7 +41,11 @@ export default async function Home({ params: { locale } }: { params: { locale: s
 
   const included = [t('included1'), t('included2'), t('included3'), t('included4'), t('included5')];
   // Four questions now — the certificate Q&A was removed on request.
-  const faqs = [1, 2, 3, 4].map((n) => [f(`q${n}` as 'q1'), f(`a${n}` as 'a1')]);
+  // Three questions. The payment-plans Q&A went with the instalment offer.
+  // This loop and the one on /faq must stay in step with the q*/a* keys that
+  // actually exist: next-intl renders a missing message as a visible error
+  // string, and both loops also feed schema.org FAQPage data to Google.
+  const faqs = [1, 2, 3].map((n) => [f(`q${n}` as 'q1'), f(`a${n}` as 'a1')]);
 
   return (
     <>
@@ -79,12 +83,6 @@ export default async function Home({ params: { locale } }: { params: { locale: s
               <a href="#curriculum" className="btn-outline w-full justify-center xs:w-auto">{t('ctaSecondary')}</a>
             </div>
 
-            {left !== null && left > 0 && (
-              <p className="mt-8 flex items-center gap-2.5 text-xs font-semibold text-steel">
-                <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-brass" />
-                {p('seatsLeft', { count: left })} — Production Partner
-              </p>
-            )}
           </div>
 
           {/*
@@ -159,7 +157,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
         <div className="mx-auto max-w-content px-5 py-20">
           <Reveal as="h2" className="display h-section">{t('curriculumTitle')}</Reveal>
           <p className="mt-4 max-w-2xl italic text-steel">{t('curriculumNote')}</p>
-          <Curriculum locale={locale} labels={{ available: t('statusAvailable'), coming: t('statusComing') }} />
+          <Curriculum locale={locale} />
           <p className="mt-12 max-w-3xl border-s-4 border-brass ps-6 italic text-steel">{t('curriculumFooter')}</p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link href={lh(locale, '/pricing#plans')} className="btn-primary w-full justify-center xs:w-auto">
@@ -185,17 +183,23 @@ export default async function Home({ params: { locale } }: { params: { locale: s
           locale={locale}
           labels={{
             egypt: ar ? 'مصر' : 'Egypt',
-            intl: ar ? 'الخليج / دولي' : 'Gulf / International',
             custom: p('customPrice'),
-            installments: ar ? 'أو' : 'or'
+            bestValue: ar ? 'الأفضل قيمة' : 'Best value'
           }}
         />
-        <p className="surface-card mt-8 max-w-3xl p-6 text-sm leading-relaxed text-steel">
-          {t('partnerNote')}
-        </p>
-        <div className="mt-8 flex flex-col gap-3 xs:flex-row xs:flex-wrap">
+        {/*
+         * The Production Partner explainer card and its "Request a call" button
+         * used to sit here. Both are gone: the note existed mainly to justify
+         * the 3-seat pilot framing, which no longer applies, and the second
+         * button competed with Subscribe at the exact point the table has just
+         * made the case for Freelance Ready.
+         *
+         * The Production Partner path is not closed — the tier is still in the
+         * comparison above, and /apply-production-partner is still reachable
+         * from the pricing page's own "Request a call" button on that tier.
+         */}
+        <div className="mt-8">
           <Link href={lh(locale, '/pricing#plans')} className="btn-primary w-full justify-center xs:w-auto">{p('subscribe')}</Link>
-          <Link href={lh(locale, '/apply-production-partner')} className="btn-outline w-full justify-center xs:w-auto">{p('requestCall')}</Link>
         </div>
       </section>
       )}
@@ -220,18 +224,16 @@ export default async function Home({ params: { locale } }: { params: { locale: s
         </div>
       </section>
 
-      {/* ── 7. PRICING + PAYMENT PLANS ── */}
-      <section className="mx-auto max-w-content px-5 py-20">
-        <Reveal as="h2" className="display h-section">{t('pricingTitle')}</Reveal>
-        <div className="mt-8 grid max-w-4xl gap-6">
-          <p className="leading-relaxed text-steel">{t('pricing2')}</p>
-        </div>
-        <div className="mt-9 flex flex-wrap items-center gap-3">
-          <MagneticButton href={lh(locale, '/pricing#plans')} className="btn-brass w-full justify-center xs:w-auto">{p('subscribe')}</MagneticButton>
-        </div>
-      </section>
-
-      {/* ── 8. FAQ ── */}
+      {/*
+       * Section 7, "Pricing + payment plans", was removed.
+       *
+       * Its whole subject was the instalment offer ("every tier is available on
+       * a payment plan"), which no longer exists. What remained after that
+       * sentence was a heading and a third Subscribe button, on a page that
+       * already carries one in the hero and another under the comparison table.
+       * Prices themselves live on /pricing and in the comparison table above.
+       */}
+      {/* ── 7. FAQ ── */}
       <section className="mx-3 overflow-hidden rounded-[2.25rem] bg-white md:mx-5">
         <div className="mx-auto max-w-content px-5 py-20">
           <Reveal as="h2" className="display h-section">{f('title')}</Reveal>
@@ -251,7 +253,7 @@ export default async function Home({ params: { locale } }: { params: { locale: s
         </div>
       </section>
 
-      {/* ── 9. FINAL CTA ── */}
+      {/* ── 8. FINAL CTA ── */}
       <section className="mx-auto max-w-content px-5 py-20">
         <div className="relative overflow-hidden rounded-[1.5rem] bg-brass p-7 text-white sm:rounded-[2.25rem] sm:p-10 md:p-16">
           <div aria-hidden className="facet-field pointer-events-none absolute inset-0 text-white/25" />

@@ -359,7 +359,7 @@ export async function updateRequest(formData: FormData) {
   done();
 }
 
-/** Manual enrolment after the call: grants access and takes one of the 3 seats. */
+/** Manual enrolment after the call: grants access and records the enrolment. */
 export async function grantProductionPartner(formData: FormData) {
   const { db } = await guard();
   const userId = str(formData.get('user_id'));

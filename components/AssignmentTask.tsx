@@ -210,8 +210,8 @@ export default function AssignmentTask({
           if (attempt === 2) {
             throw new Error(
               ar
-                ? 'اكتمل رفع الملف إلى Drive، لكن انقطع الاتصال قبل تسجيل التسليم. اضغط رفع مرة أخرى — لن يُرفع الملف من جديد.'
-                : 'The file finished uploading to Drive, but the connection dropped before the submission was recorded. Press upload again — the file will not be re-uploaded.'
+                ? 'اكتمل رفع الملف إلى Drive، لكن انقطع الاتصال قبل تسجيل التسليم. اضغط رفع مرة أخرى، ولن يُرفع الملف من جديد.'
+                : 'The file finished uploading to Drive, but the connection dropped before the submission was recorded. Press upload again. The file will not be re-uploaded.'
             );
           }
           await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));

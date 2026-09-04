@@ -51,7 +51,7 @@ export async function generateMetadata({ params: { locale } }: { params: { local
 
   return {
     metadataBase: new URL(site),
-    title: { default: title, template: `%s — ${title}` },
+    title: { default: title, template: `%s · ${title}` },
     description,
     alternates: {
       canonical: `${site}${lh(locale)}`,

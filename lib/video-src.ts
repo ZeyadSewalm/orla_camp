@@ -1,5 +1,6 @@
 import { signedEmbedUrl, bunnyThumbnail, bunnyGuidFrom } from '@/lib/bunny';
 import { driveEmbedUrl, driveThumbnail } from '@/lib/drive';
+import { youtubeEmbedUrl, youtubeThumbnail } from '@/lib/youtube';
 
 type VideoModule = {
   video_source: string | null;
@@ -27,6 +28,21 @@ export function videoSrcFor(m: VideoModule): string | null {
    * player with no explanation. Reading the GUID out of the link makes those
    * lessons play without anyone having to re-enter them.
    */
+  /*
+   * YouTube. Checked before Bunny because a YouTube link lives in the same
+   * `video_link` column as a Drive link, and driveEmbedUrl would otherwise
+   * fail to find a Drive ID in it and return null — the same silent black
+   * player the Bunny links used to produce.
+   *
+   * The source flag is not required to match: a YouTube URL is unambiguous,
+   * so a lesson still marked 'drive' with a YouTube link in it plays rather
+   * than breaking.
+   */
+  const youtube = youtubeEmbedUrl(m.video_link);
+  if (m.video_source === 'youtube' || youtube) {
+    if (youtube) return youtube;
+  }
+
   const guid = m.bunny_video_id ?? bunnyGuidFrom(m.video_link);
 
   if (m.video_source === 'bunny' && guid) {
@@ -56,6 +72,8 @@ export function posterFor(m: VideoModule): string | null {
   // Order matters: an explicitly uploaded image is a deliberate choice and
   // always wins over anything generated.
   if (m.thumbnail_url) return m.thumbnail_url;
+  const youtubePoster = youtubeThumbnail(m.video_link);
+  if (youtubePoster) return youtubePoster;
   const guid = m.bunny_video_id ?? bunnyGuidFrom(m.video_link);
   if (guid) return bunnyThumbnail(guid);
   // Drive makes a thumbnail for every video it holds. Without this, every
