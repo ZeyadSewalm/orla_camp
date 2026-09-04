@@ -2,11 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations, unstable_setRequestLocale } from 'next-intl/server';
-import StudentDashboard from '@/components/StudentDashboard';
 import CoursePlayer, { type CourseLessonVM } from '@/components/CoursePlayer';
 import { videoSrcFor, posterFor } from '@/lib/video-src';
 import { createClient, getSessionUser } from '@/lib/supabase/server';
-import { getCachedProfile, getModules, getSiteSettings } from '@/lib/data';
+import { getCachedProfile, getModules } from '@/lib/data';
 import type { Assignment, AssignmentSubmission, CourseModule, LessonProgress } from '@/lib/types';
 import { lh } from '@/lib/href';
 
@@ -32,10 +31,9 @@ export default async function Course({ params: { locale } }: { params: { locale:
   const user = await getSessionUser();
   if (!user) redirect(lh(locale, '/login?next=/course'));
 
-  const [profile, modules, siteSettings] = await Promise.all([
+  const [profile, modules] = await Promise.all([
     getCachedProfile(user.id),
-    getModules(),
-    getSiteSettings()
+    getModules()
   ]);
 
   if (!profile) redirect(lh(locale, '/login?next=/course'));
@@ -46,7 +44,6 @@ export default async function Course({ params: { locale } }: { params: { locale:
   const supabase = createClient();
   const [
     { data: progressRows, error: progressError },
-    { data: submissions },
     { data: assignmentRows, error: assignmentsError },
     { data: taskSubmissionRows, error: taskSubmissionsError }
   ] = await Promise.all([
@@ -55,12 +52,6 @@ export default async function Course({ params: { locale } }: { params: { locale:
       .select('user_id,module_id,is_completed,watch_seconds,started_at,last_watched_at,completed_at,updated_at')
       .eq('user_id', user.id)
       .order('last_watched_at', { ascending: false }),
-    supabase
-      .from('case_file_submissions')
-      .select('id,module_id,status,submitted_at,reviewed_at')
-      .eq('user_id', user.id)
-      .order('submitted_at', { ascending: false })
-      .limit(6),
     supabase
       .from('assignments')
       .select('id,lesson_id,title_ar,title_en,description_ar,description_en,max_score,allowed_file_types,max_file_size_mb,due_date,active,allow_resubmission,drive_folder_id,created_at,updated_at')
@@ -163,105 +154,12 @@ export default async function Course({ params: { locale } }: { params: { locale:
     if (open) unlockedModuleIds.add(current.id);
   }
 
-  const authName =
-    (typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()) ||
-    (typeof user.user_metadata?.name === 'string' && user.user_metadata.name.trim()) ||
-    '';
-  const email = profile.email || user.email || '';
-  const displayName = profile.full_name?.trim() || authName || email.split('@')[0] || (ar ? 'طالب' : 'Student');
-  const avatarUrl =
-    (typeof user.user_metadata?.avatar_url === 'string' && user.user_metadata.avatar_url) ||
-    (typeof user.user_metadata?.picture === 'string' && user.user_metadata.picture) ||
-    null;
-  const courseName = ar
-    ? siteSettings?.landing_title_ar || 'OrlaDent Camp'
-    : siteSettings?.landing_title_en || 'OrlaDent Camp';
-
-  const activities: Array<{
-    id: string;
-    type: 'completed' | 'watched' | 'submitted' | 'reviewed' | 'task_submitted' | 'task_graded' | 'task_revision';
-    title: string;
-    meta: string;
-    at: string;
-  }> = [];
-
-  for (const row of progress) {
-    const module = modulesById.get(row.module_id);
-    if (!module) continue;
-    const lessonTitle = ar ? module.title_ar : module.title_en;
-
-    if (row.is_completed && row.completed_at) {
-      activities.push({
-        id: `completed-${row.module_id}-${row.completed_at}`,
-        type: 'completed',
-        title: ar ? `أكملت درس «${lessonTitle}»` : `Completed “${lessonTitle}”`,
-        meta: courseName,
-        at: row.completed_at
-      });
-    } else if (row.last_watched_at) {
-      const minutes = Math.max(1, Math.round((row.watch_seconds || 0) / 60));
-      activities.push({
-        id: `watched-${row.module_id}-${row.last_watched_at}`,
-        type: 'watched',
-        title: ar ? `واصلت مشاهدة «${lessonTitle}»` : `Continued “${lessonTitle}”`,
-        meta: row.watch_seconds > 0
-          ? (ar ? `${minutes} دقيقة مشاهدة مسجلة` : `${minutes} min recorded watch time`)
-          : courseName,
-        at: row.last_watched_at
-      });
-    }
-  }
-
-  for (const submission of submissions ?? []) {
-    const module = submission.module_id ? modulesById.get(submission.module_id) : null;
-    const lessonTitle = module ? (ar ? module.title_ar : module.title_en) : courseName;
-    const reviewed = submission.status === 'reviewed' && !!submission.reviewed_at;
-    activities.push({
-      id: `${reviewed ? 'reviewed' : 'submitted'}-${submission.id}`,
-      type: reviewed ? 'reviewed' : 'submitted',
-      title: reviewed
-        ? (ar ? 'تمت مراجعة ملف الحالة' : 'Your case file was reviewed')
-        : (ar ? 'رفعت ملف حالة للمراجعة' : 'Uploaded a case file for review'),
-      meta: lessonTitle,
-      at: reviewed ? submission.reviewed_at! : submission.submitted_at
-    });
-  }
-
-
-  for (const submission of taskSubmissions) {
-    if (submission.status === 'uploading' || submission.status === 'failed') continue;
-    const assignment = assignments.find((item) => item.id === submission.assignment_id);
-    if (!assignment) continue;
-    const taskTitle = ar ? assignment.title_ar : assignment.title_en;
-    const activityAt = submission.graded_at || submission.submitted_at || submission.updated_at;
-    if (submission.status === 'graded') {
-      activities.push({
-        id: `task-graded-${submission.id}`,
-        type: 'task_graded',
-        title: ar ? `تم تقييم مهمة «${taskTitle}»` : `Task graded: “${taskTitle}”`,
-        meta: submission.grade !== null ? `${submission.grade} / ${assignment.max_score}` : courseName,
-        at: activityAt
-      });
-    } else if (submission.status === 'needs_revision') {
-      activities.push({
-        id: `task-revision-${submission.id}`,
-        type: 'task_revision',
-        title: ar ? `مهمة «${taskTitle}» تحتاج تعديل` : `Revision requested: “${taskTitle}”`,
-        meta: courseName,
-        at: activityAt
-      });
-    } else {
-      activities.push({
-        id: `task-submitted-${submission.id}`,
-        type: 'task_submitted',
-        title: ar ? `تم تسليم مهمة «${taskTitle}»` : `Submitted task: “${taskTitle}”`,
-        meta: courseName,
-        at: submission.submitted_at || submission.updated_at
-      });
-    }
-  }
-
-  activities.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  /*
+   * The identity fields and the activity feed that used to be built here
+   * moved to lib/student-overview.ts with the dashboard. Leaving them
+   * behind meant this page still assembled a feed nobody rendered, on
+   * every lesson view.
+   */
 
   /*
    * The lesson list handed to the client player. Locked lessons still carry
@@ -309,25 +207,18 @@ export default async function Course({ params: { locale } }: { params: { locale:
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-5 sm:py-10 md:py-14">
-      <StudentDashboard
-        locale={locale}
-        name={displayName}
-        email={email}
-        avatarUrl={avatarUrl}
-        courseName={courseName}
-        courseImage={siteSettings?.landing_image_url ?? null}
-        modules={modules}
-        progress={progress}
-        progressAvailable={!progressError}
-        activities={activities}
-        taskSummaries={assignments.map((assignment) => ({
-          assignment,
-          submission: latestTaskSubmissionByAssignment.get(assignment.id) ?? null,
-          lesson: modulesById.get(assignment.lesson_id) ?? null
-        }))}
-      />
-
-      <section className="mt-14 border-t border-ink/10 pt-10 md:mt-20 md:pt-14" aria-labelledby="course-content-title">
+      {/*
+       * THE DASHBOARD MOVED TO /profile.
+       *
+       * The welcome banner, stats, recent activity and STL task grid used to
+       * sit above this section. All of it is personal rather than
+       * instructional — it answered "how am I doing?", not "what am I
+       * learning?" — and it pushed the player itself below the fold on every
+       * single visit to the page a student opens to watch a lesson.
+       *
+       * This page is now the lessons and nothing else.
+       */}
+      <section aria-labelledby="course-content-title">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="label">{t('learningArea')}</p>

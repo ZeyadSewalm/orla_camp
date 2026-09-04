@@ -6,6 +6,8 @@ import { createClient, getProfile } from '@/lib/supabase/server';
 import { lh } from '@/lib/href';
 import { CRITERIA, parseBreakdown } from '@/lib/scoring';
 import LeaderboardVisibility from '@/components/LeaderboardVisibility';
+import StudentDashboard from '@/components/StudentDashboard';
+import { getStudentOverview } from '@/lib/student-overview';
 
 export const metadata: Metadata = { robots: { index: false } };
 export const dynamic = 'force-dynamic';
@@ -31,6 +33,16 @@ export default async function Profile({ params: { locale } }: { params: { locale
   const me = await getProfile();
   if (!me) redirect(lh(locale, '/login'));
   if (!me.has_access) redirect(lh(locale, '/pricing'));
+
+  /*
+   * The dashboard moved here from /course.
+   *
+   * It was always personal data — your name, your streak, your recent activity,
+   * your STL tasks — sitting on top of a page whose job is playing lessons. On
+   * /course it pushed the player below the fold and repeated on every visit;
+   * here it is what the page is for.
+   */
+  const overview = await getStudentOverview(locale);
 
   const supabase = createClient();
 
@@ -92,10 +104,29 @@ export default async function Profile({ params: { locale } }: { params: { locale
   const awaiting = submissions.filter((s) => s.status === 'submitted' || s.status === 'under_review' || s.status === 'resubmitted').length;
 
   return (
-    <div className="mx-auto max-w-4xl px-5 py-14">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-5 sm:py-10 md:py-14">
+      {/* The welcome banner, at-a-glance stats, recent activity and STL task
+          grid. Rendered only when the overview loaded — a failed fetch should
+          cost the banner, not the whole profile. */}
+      {overview && (
+        <StudentDashboard
+          locale={locale}
+          name={overview.displayName}
+          email={overview.email}
+          avatarUrl={overview.avatarUrl}
+          courseName={overview.courseName}
+          courseImage={overview.courseImage}
+          modules={overview.modules}
+          progress={overview.progress}
+          progressAvailable={overview.progressAvailable}
+          activities={overview.activities}
+          taskSummaries={overview.taskSummaries}
+        />
+      )}
+
+      <header className="mt-14 flex flex-wrap items-end justify-between gap-4 border-t border-ink/10 pt-10">
         <div>
-          <h1 className="font-display text-4xl font-black">{t('title')}</h1>
+          <h1 className="font-display text-3xl font-black">{t('title')}</h1>
           <p className="mt-1 text-sm text-steel">{me.full_name || me.email}</p>
         </div>
         <Link href={lh(locale, '/course')} className="btn-quiet text-xs">{t('backToCourse')}</Link>

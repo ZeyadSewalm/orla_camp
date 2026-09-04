@@ -104,7 +104,7 @@ export default function PricingClient({
                     </p>
                   ) : exclusive ? (
                     // Outline + a phone icon: this is a conversation, not a checkout
-                    <Link href={lh(locale, '/apply-production-partner')} className="btn-on-dark w-full">
+                    <Link href={lh(locale, '/apply-production-partner')} className="btn-outline w-full">
                       <Phone aria-hidden className="h-4 w-4" /> {t('requestCall')}
                     </Link>
                   ) : (
