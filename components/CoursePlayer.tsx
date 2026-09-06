@@ -21,6 +21,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { lh } from '@/lib/href';
 import VideoEmbed from '@/components/VideoEmbed';
+import ForensicWatermark from '@/components/ForensicWatermark';
 import UploadCaseFile from '@/components/UploadCaseFile';
 import AssignmentTask from '@/components/AssignmentTask';
 import type { Assignment, AssignmentSubmission } from '@/lib/types';
@@ -58,11 +59,14 @@ export default function CoursePlayer({
   locale,
   userId,
   lessons,
+  watermark,
   initialActiveId
 }: {
   locale: string;
   userId: string;
   lessons: CourseLessonVM[];
+  /** Identity burned over the video. Empty string renders nothing. */
+  watermark: string;
   initialActiveId: string;
 }) {
   const ar = locale === 'ar';
@@ -366,7 +370,10 @@ export default function CoursePlayer({
               </Link>
             </div>
           ) : (
-            <div className="-mx-4 w-[calc(100%+2rem)] sm:mx-0 sm:w-full">
+            // `relative` is what the watermark positions against. Without it the
+            // label would escape to the nearest positioned ancestor and drift
+            // across the whole page instead of the video.
+            <div className="relative -mx-4 w-[calc(100%+2rem)] sm:mx-0 sm:w-full">
               <VideoEmbed
                 key={active.id}
                 src={active.src}
@@ -378,6 +385,7 @@ export default function CoursePlayer({
                 edgeToEdge
                 onEnded={() => handleAutoEnded(active.id)}
               />
+              <ForensicWatermark label={watermark} />
             </div>
           )}
 

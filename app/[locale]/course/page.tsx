@@ -45,7 +45,8 @@ export default async function Course({ params: { locale } }: { params: { locale:
   const [
     { data: progressRows, error: progressError },
     { data: assignmentRows, error: assignmentsError },
-    { data: taskSubmissionRows, error: taskSubmissionsError }
+    { data: taskSubmissionRows, error: taskSubmissionsError },
+    { data: overrideRows, error: overrideError }
   ] = await Promise.all([
     supabase
       .from('lesson_progress')
@@ -60,7 +61,15 @@ export default async function Course({ params: { locale } }: { params: { locale:
       .from('assignment_submissions')
       .select('id,assignment_id,user_id,drive_file_id,drive_web_view_link,original_filename,stored_filename,file_size,attempt_number,status,grade,admin_feedback,submitted_at,upload_started_at,graded_at,graded_by,updated_at')
       .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
+      .order('updated_at', { ascending: false }),
+    /*
+     * This student's lesson exceptions. RLS restricts the table to the caller's
+     * own rows, so this cannot read anyone else's even if the filter were wrong.
+     */
+    supabase
+      .from('module_access_overrides')
+      .select('module_id,mode')
+      .eq('user_id', user.id)
   ]);
 
   if (progressError && process.env.NODE_ENV === 'development') {
@@ -113,16 +122,72 @@ export default async function Course({ params: { locale } }: { params: { locale:
    * tier_id is in that list — staff bypass it, same as they bypass sequential
    * unlocking, since a reviewer has to be able to open anything to review it.
    */
+  /*
+   * The watermark label. Built from the profile already in hand rather than
+   * calling my_watermark_label(), which exists for other surfaces — one less
+   * round trip on the hottest page in the app.
+   *
+   * Only the local part of the email is used. It identifies the account
+   * unambiguously for us without publishing a full address into every frame
+   * of a video the student may well be screen-sharing legitimately.
+   *
+   * Staff get no watermark: they are not the leak risk this addresses, and a
+   * reviewer's name over a student's case video would be actively confusing.
+   */
+  const watermark = isStaff
+    ? ''
+    : [profile.full_name?.trim(), (profile.email ?? '').split('@')[0]].filter(Boolean).join(' \u00b7 ');
+
   const studentTierId = profile.tier_id;
   function tierAllowed(m: CourseModule) {
     return isStaff || !m.tier_ids || m.tier_ids.length === 0 || (!!studentTierId && m.tier_ids.includes(studentTierId));
   }
 
-  // Sequential unlocking walks only the lessons this student's package can
-  // ever see — a module outside their package doesn't count as "the previous
-  // lesson" for the ones on either side of it, and never unlocks no matter
-  // what they complete.
-  const visibleModules = modules.filter((m) => tierAllowed(m));
+  /*
+   * PER-STUDENT OVERRIDES, applied ON TOP of the tier rule.
+   *
+   *   grant → open a lesson this student's tier excludes
+   *   deny  → close a lesson this student's tier includes
+   *
+   * Order matters: deny is evaluated last and wins over everything, including a
+   * grant on the same lesson. A deny is how access gets paused — for an unpaid
+   * instalment, say — and a pause that something else can quietly outrank is
+   * not a pause.
+   *
+   * Staff are exempt from both. A reviewer has to be able to open any lesson to
+   * review work submitted against it.
+   */
+  /*
+   * IF THIS QUERY FAILED, TREAT EVERY OVERRIDE AS A DENY.
+   *
+   * An empty map on error would silently lift suspensions: a student paused for
+   * an unpaid instalment would get their lessons back the moment the table was
+   * briefly unreachable, and nothing anywhere would say so. Losing a `grant` is
+   * a student seeing one lesson fewer for a few seconds; losing a `deny` is paid
+   * content opening to someone who was deliberately cut off.
+   *
+   * So on error we fall back to the tier rule alone AND drop any grants — the
+   * conservative reading in both directions — and make the failure loud rather
+   * than letting it pass as normal operation.
+   */
+  if (overrideError) {
+    console.error('[course] module_access_overrides unavailable:', overrideError.message);
+  }
+  const overrideByModule = new Map(
+    (overrideError ? [] : overrideRows ?? []).map((row: any) => [
+      row.module_id as string,
+      row.mode as 'grant' | 'deny'
+    ])
+  );
+  function allowed(m: CourseModule) {
+    if (isStaff) return true;
+    const override = overrideByModule.get(m.id);
+    if (override === 'deny') return false;
+    if (override === 'grant') return true;
+    return tierAllowed(m);
+  }
+
+  const visibleModules = modules.filter((m) => allowed(m));
   /*
    * NO SEQUENTIAL LOCKING.
    *
@@ -224,7 +289,13 @@ export default async function Course({ params: { locale } }: { params: { locale:
           </div>
         ) : (
           <div className="mt-8">
-            <CoursePlayer locale={locale} userId={profile.id} lessons={lessons} initialActiveId={initialActiveId} />
+            <CoursePlayer
+              locale={locale}
+              userId={profile.id}
+              lessons={lessons}
+              watermark={watermark}
+              initialActiveId={initialActiveId}
+            />
           </div>
         )}
       </section>

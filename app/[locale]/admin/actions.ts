@@ -520,3 +520,56 @@ export async function signCaseFile(path: string) {
   const { data } = await db.storage.from('case-files').createSignedUrl(path, 60 * 10);
   return data?.signedUrl ?? null;
 }
+
+/**
+ * Sets or clears one student's exception on one lesson.
+ *
+ * Three states, one form: 'grant' opens a lesson their tier excludes, 'deny'
+ * closes one it includes, and '' (default) removes the exception so the tier
+ * decides again. Modelling "no exception" as deleting the row rather than
+ * storing a third mode keeps the table sparse and makes "who has exceptions?"
+ * a plain SELECT rather than a filtered one.
+ */
+export async function setModuleOverride(formData: FormData) {
+  const { db, admin } = await guard();
+
+  const userId = String(formData.get('user_id'));
+  const moduleId = String(formData.get('module_id'));
+  const mode = str(formData.get('mode'));
+
+  if (!userId || !moduleId) throw new Error('user and module are required');
+
+  if (!mode) {
+    const { error } = await db
+      .from('module_access_overrides')
+      .delete()
+      .eq('user_id', userId)
+      .eq('module_id', moduleId);
+    if (error) throw new Error(`clear override failed: ${error.message}`);
+    done();
+    return;
+  }
+
+  if (mode !== 'grant' && mode !== 'deny') throw new Error('invalid mode');
+
+  /*
+   * Upsert on the (user_id, module_id) unique constraint. Switching a student
+   * from grant to deny has to REPLACE the row — an insert would violate the
+   * constraint and a blind update would silently do nothing if no row existed.
+   */
+  const { error } = await db
+    .from('module_access_overrides')
+    .upsert(
+      {
+        user_id: userId,
+        module_id: moduleId,
+        mode,
+        note: str(formData.get('note')),
+        created_by: admin.id,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: 'user_id,module_id' }
+    );
+  if (error) throw new Error(`save override failed: ${error.message}`);
+  done();
+}

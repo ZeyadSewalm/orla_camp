@@ -19,7 +19,7 @@ import {
   updateTier, saveModule, deleteModule, reviewCaseFile, updateRequest,
   grantProductionPartner, saveSession, deleteSession, saveCommunity, savePromo,
   deletePromo, saveSettings, updateStudent, recordManualPayment,
-  saveAssignment, deleteAssignment, reviewAssignmentSubmission
+  saveAssignment, deleteAssignment, reviewAssignmentSubmission, setModuleOverride
 } from './actions';
 
 export const metadata: Metadata = { robots: { index: false } };
@@ -1084,11 +1084,14 @@ async function Students({
 
   // ---- detail view ----
   if (studentId) {
-    const [{ data: student }, { data: pays }, { data: cases }] = await Promise.all([
-      db.from('profiles').select('*').eq('id', studentId).single(),
-      db.from('payments').select('*, tiers(name_en)').eq('user_id', studentId).order('created_at', { ascending: false }),
-      db.from('case_file_submissions').select('*').eq('user_id', studentId).order('submitted_at', { ascending: false })
-    ]);
+    const [{ data: student }, { data: pays }, { data: cases }, { data: allModules }, { data: overrides }] =
+      await Promise.all([
+        db.from('profiles').select('*').eq('id', studentId).single(),
+        db.from('payments').select('*, tiers(name_en)').eq('user_id', studentId).order('created_at', { ascending: false }),
+        db.from('case_file_submissions').select('*').eq('user_id', studentId).order('submitted_at', { ascending: false }),
+        db.from('course_modules').select('id,title_ar,title_en,order_index,tier_ids').order('order_index'),
+        db.from('module_access_overrides').select('module_id,mode,note').eq('user_id', studentId)
+      ]);
 
     if (!student) return <Empty title={t('notFound')}>{t('notFoundBody')}</Empty>;
 
@@ -1139,6 +1142,72 @@ async function Students({
             <Field label={t('notes')}><textarea name="admin_notes" rows={3} defaultValue={student.admin_notes ?? ''} className="field" /></Field>
             <div className="flex items-end"><SubmitButton className="btn-primary w-full">{save}</SubmitButton></div>
           </form>
+        </Card>
+
+        {/*
+          * PER-LESSON EXCEPTIONS.
+          *
+          * The tier is still the rule. This is the documented way to break it
+          * for one student, and every row records who set it and why — an
+          * exception nobody can explain is one nobody will dare remove.
+          *
+          * "Tier default" deletes the row rather than storing a third mode, so
+          * the table only ever holds actual exceptions.
+          */}
+        <Card>
+          <h3 className="font-display text-lg font-bold">Lesson access exceptions</h3>
+          <p className="mt-1 text-xs leading-relaxed text-steel">
+            Overrides this student&apos;s plan for one lesson. <strong>Deny wins over grant</strong>,
+            and staff are exempt from both. Leave a lesson on &ldquo;Tier default&rdquo; unless
+            there is a reason to override it.
+          </p>
+
+          <ul className="mt-5 divide-y divide-line">
+            {(allModules ?? []).map((m: any) => {
+              const current = (overrides ?? []).find((o: any) => o.module_id === m.id);
+              const inTier =
+                !m.tier_ids?.length ||
+                (!!student.tier_id && m.tier_ids.includes(student.tier_id));
+
+              return (
+                <li key={m.id} className="py-3">
+                  <form action={setModuleOverride} className="grid gap-3 sm:grid-cols-[1fr_9rem_1fr_auto] sm:items-end">
+                    <input type="hidden" name="user_id" value={student.id} />
+                    <input type="hidden" name="module_id" value={m.id} />
+
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">
+                        <span className="figure me-2 text-xs text-steel">
+                          {String(m.order_index).padStart(2, '0')}
+                        </span>
+                        {locale === 'ar' ? m.title_ar : m.title_en}
+                      </p>
+                      {/* What the plan alone would do, so the effect of an
+                          override is legible without cross-referencing tiers. */}
+                      <p className="mt-0.5 text-[0.7rem] text-steel">
+                        Plan: {inTier ? 'included' : 'not included'}
+                      </p>
+                    </div>
+
+                    <select name="mode" defaultValue={current?.mode ?? ''} className="field text-sm">
+                      <option value="">Tier default</option>
+                      <option value="grant">Grant</option>
+                      <option value="deny">Deny</option>
+                    </select>
+
+                    <input
+                      name="note"
+                      defaultValue={current?.note ?? ''}
+                      placeholder="Reason (e.g. partial payment)"
+                      className="field text-sm"
+                    />
+
+                    <SubmitButton className="btn-quiet text-xs">{save}</SubmitButton>
+                  </form>
+                </li>
+              );
+            })}
+          </ul>
         </Card>
 
         <Card>
