@@ -146,7 +146,7 @@ export async function middleware(request: NextRequest) {
    *                        or /course because an auth check happened to error.
    */
   let user: { id: string } | null = null;
-  let profile: { has_access: boolean | null; role: string | null } | null = null;
+  let profile: { has_access: boolean | null; role: string | null; last_login_at: string | null } | null = null;
 
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -173,10 +173,31 @@ export async function middleware(request: NextRequest) {
     if (isProtected && user) {
       const { data: row } = await supabase
         .from('profiles')
-        .select('has_access, role')
+        .select('has_access, role, last_login_at')
         .eq('id', user.id)
         .single();
       profile = row;
+
+      /*
+       * LAST-SEEN STAMP, for the WhatsApp inactivity reminder.
+       *
+       * The profile row is already in hand, so deciding whether to stamp costs
+       * nothing. The RPC only fires when the stamp is over an hour old — once
+       * an hour at most per student, not on every navigation — so the added
+       * latency is a rare single round trip rather than a tax on every page.
+       *
+       * Awaited, not fire-and-forget: an un-awaited promise in edge middleware
+       * can be cut off when the response returns, and the stamp silently lost.
+       *
+       * Failure is swallowed deliberately. A missed stamp costs, at worst, one
+       * unnecessary reminder. Blocking a paying student from their course
+       * because a bookkeeping write failed would be absurd.
+       */
+      const lastSeen = row?.last_login_at ? new Date(row.last_login_at).getTime() : 0;
+      if (Date.now() - lastSeen > 60 * 60 * 1000) {
+        const { error: touchError } = await supabase.rpc('touch_last_seen');
+        if (touchError) console.warn('[mw] last-seen stamp failed:', touchError.message);
+      }
     }
   } catch (error) {
     rethrowIfControlFlow(error);

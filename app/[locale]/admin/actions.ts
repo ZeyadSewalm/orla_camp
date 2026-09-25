@@ -5,6 +5,7 @@ import { getProfile, requireAdmin } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { bunnyGuidFrom } from '@/lib/bunny';
 import { CRITERIA } from '@/lib/scoring';
+import { notifyCaseGraded } from '@/lib/whatsapp';
 
 async function guard() {
   const admin = await requireAdmin();
@@ -304,7 +305,7 @@ export async function reviewAssignmentSubmission(formData: FormData) {
 
   const { data: submission } = await db
     .from('assignment_submissions')
-    .select('id,assignment_id')
+    .select('id,assignment_id,user_id')
     .eq('id', id)
     .maybeSingle();
   if (!submission) throw new Error('submission not found');
@@ -368,6 +369,25 @@ export async function reviewAssignmentSubmission(formData: FormData) {
     graded_by: me.id,
     updated_at: now
   }).eq('id', id);
+
+  /*
+   * WhatsApp the student their grade. Only on 'graded' — "needs revision"
+   * and "under review" are not news worth a paid message — and only after the
+   * grade is saved, so a notification can never describe a grade that failed
+   * to persist. notifyCaseGraded never throws: a WhatsApp problem must not
+   * turn a successful grading into an error for the reviewer.
+   */
+  if (status === 'graded' && grade !== null) {
+    const outcome = await notifyCaseGraded(db, {
+      submissionId: submission.id,
+      studentId: submission.user_id,
+      grade,
+      maxScore: Number(assignment.max_score),
+      gradedAt: now
+    });
+    if (!outcome.sent) console.info('[grading] WhatsApp not sent:', outcome.reason);
+  }
+
   done();
 }
 

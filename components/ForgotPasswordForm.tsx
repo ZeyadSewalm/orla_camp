@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { siteOrigin } from '@/lib/site-url';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -37,7 +38,7 @@ export default function ForgotPasswordForm({ locale }: { locale: string }) {
         // carries a one-time code that has to be exchanged for a session
         // server-side first. `locale` rides along so an Arabic user comes back
         // to an Arabic page.
-        redirectTo: `${window.location.origin}/api/auth/callback?next=/reset-password&locale=${locale}`
+        redirectTo: `${siteOrigin()}/api/auth/callback?next=/reset-password&locale=${locale}`
       });
       if (error) throw error;
       setSent(true);

@@ -22,7 +22,29 @@ export const dynamic = 'force-dynamic';
  * usual reason a reset flow looks like it silently does nothing.
  */
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = request.nextUrl;
+  const { searchParams } = request.nextUrl;
+
+  /*
+   * ALWAYS REDIRECT TO THE CANONICAL DOMAIN.
+   *
+   * This used to use `request.nextUrl.origin` — the host the request happened
+   * to arrive on. Every Vercel deployment also answers on its own generated
+   * hostname (orla-camp-<hash>.vercel.app), and Supabase will happily send a
+   * user to whichever URL is registered in its redirect list. Land on the
+   * deployment URL once and `origin` pins you there: the user finishes logging
+   * in and spends the rest of the session on a machine-generated address
+   * instead of camp.orladent.com.
+   *
+   * That is not only ugly. Session cookies are set per host, so a student who
+   * later types the real domain is signed out again, and any link they copy
+   * and share points at a deployment that will eventually be rotated away.
+   *
+   * NEXT_PUBLIC_SITE_URL is the one address this site is meant to live at, so
+   * it is what every redirect from here is built against. The fallback to the
+   * request origin only matters in local development, where the env var may be
+   * unset.
+   */
+  const origin = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') || request.nextUrl.origin;
   const code = searchParams.get('code');
   const next = searchParams.get('next') ?? '/reset-password';
 

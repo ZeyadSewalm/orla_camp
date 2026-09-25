@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { siteOrigin } from '@/lib/site-url';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -66,7 +67,7 @@ export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; l
             data: { full_name: fullName.trim(), region },
             // lh() keeps Arabic unprefixed; a hard-coded `/${locale}/login`
             // sent Arabic users to "/ar/login", which does not exist.
-            emailRedirectTo: `${window.location.origin}${lh(locale, '/login')}`
+            emailRedirectTo: `${siteOrigin()}${lh(locale, '/login')}`
           }
         });
         if (error) throw error;
