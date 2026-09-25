@@ -319,7 +319,8 @@
     "attempt": "attempt {n}",
     "scoresTitle": "How your cases were scored",
     "noScores": "Nothing graded yet. Once a reviewer scores a case file, the full breakdown appears here.",
-    "statCasesGraded": "Cases graded"
+    "statCasesGraded": "Cases graded",
+    "practice": "practice — not ranked"
   },
   "leaderboard": {
     "title": "Leaderboard",

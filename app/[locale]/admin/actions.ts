@@ -4,7 +4,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { getProfile, requireAdmin } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { bunnyGuidFrom } from '@/lib/bunny';
-import { CRITERIA } from '@/lib/scoring';
+import { TOTAL_POINTS, readGradingForm, readPublish } from '@/lib/scoring';
 import { notifyCaseGraded } from '@/lib/whatsapp';
 
 async function guard() {
@@ -318,57 +318,56 @@ export async function reviewAssignmentSubmission(formData: FormData) {
   if (!assignment) throw new Error('assignment not found');
 
   /*
-   * PER-CRITERION BREAKDOWN.
+   * PER-CRITERION BREAKDOWN — shared with case review via readGradingForm(),
+   * so both screens apply identical rules.
    *
-   * Optional throughout. A reviewer who wants to type one number still can —
-   * the breakdown inputs can all be left blank — and every submission graded
-   * before this existed keeps its bare grade. `grade` stays authoritative;
-   * the breakdown is supporting detail shown to the student.
-   *
-   * Each criterion is validated against its OWN maximum, not the assignment's.
-   * Without that a reviewer could type 90 into a field worth 30 points and the
-   * parts would silently disagree with the total the student is shown.
+   * Optional throughout: a reviewer can type one total and leave every
+   * criterion blank, and older submissions keep their bare grade.
    */
-  const breakdown: Record<string, number> = {};
-  for (const criterion of CRITERIA) {
-    const raw = num(formData.get(`breakdown_${criterion.id}`));
-    if (raw === null) continue;
-    const value = Number(raw);
-    if (!Number.isFinite(value) || value < 0 || value > criterion.max) {
-      throw new Error(`${criterion.en}: score must be between 0 and ${criterion.max}`);
-    }
-    breakdown[criterion.id] = value;
-  }
-  const hasBreakdown = Object.keys(breakdown).length > 0;
+  const { breakdown, notes, sum } = readGradingForm(formData);
+  const maxScore = Number(assignment.max_score);
 
   const rawGrade = num(formData.get('grade'));
   /*
-   * If the reviewer filled the breakdown but left the total blank, the total is
-   * the sum of the parts. Doing that here rather than in the browser means it
-   * still holds if JavaScript never runs.
+   * A blank total with a filled breakdown means "total the parts".
+   *
+   * FIX: the criteria always add up to 100 (30/25/25/20), but an assignment's
+   * max_score is set per task and is not always 100. The sum used to be taken
+   * as-is, so on a task worth 50 a full breakdown produced 90/50 and the save
+   * was refused as out of range — the breakdown simply did not work on any task
+   * not worth exactly 100. The sum is now scaled onto the task's own maximum.
    */
   const grade = rawGrade === null
-    ? (hasBreakdown ? Object.values(breakdown).reduce((a, b) => a + b, 0) : null)
+    ? (sum === null ? null : Math.round((sum / TOTAL_POINTS) * maxScore * 100) / 100)
     : Number(rawGrade);
 
-  const maxScore = Number(assignment.max_score);
   if (grade !== null && (!Number.isFinite(grade) || grade < 0 || grade > maxScore)) {
     throw new Error('grade out of range');
   }
   if (status === 'graded' && grade === null) throw new Error('grade is required');
 
   const now = new Date().toISOString();
-  await db.from('assignment_submissions').update({
+  const graded = status === 'graded';
+  const { error: updateError } = await db.from('assignment_submissions').update({
     status,
-    grade: status === 'graded' ? grade : null,
+    grade: graded ? grade : null,
     // Cleared alongside the grade: a submission sent back for revision must not
     // keep showing the student the sub-scores of a grade it no longer has.
-    score_breakdown: status === 'graded' && hasBreakdown ? breakdown : null,
+    score_breakdown: graded ? breakdown : null,
+    criterion_notes: graded ? notes : null,
+    publish_to_leaderboard: readPublish(formData),
     admin_feedback: str(formData.get('admin_feedback')),
-    graded_at: status === 'graded' ? now : null,
+    graded_at: graded ? now : null,
     graded_by: me.id,
     updated_at: now
   }).eq('id', id);
+
+  /*
+   * FIX: the result of this update used to be ignored. A failed save fell
+   * straight through to the WhatsApp step, and the student was texted a grade
+   * that had never been stored.
+   */
+  if (updateError) throw new Error(`grading failed: ${updateError.message}`);
 
   /*
    * WhatsApp the student their grade. Only on 'graded' — "needs revision"
@@ -392,14 +391,102 @@ export async function reviewAssignmentSubmission(formData: FormData) {
 }
 
 /* ---------------- case file QC ---------------- */
+/**
+ * Reviews — and now grades — a case-review submission.
+ *
+ * Adapted from a contributor's version. Kept: the reviewer photo attachments,
+ * the per-criterion notes and the leaderboard control. Changed: the scoring now
+ * goes through the SAME shared rules as STL tasks (readGradingForm), stored in
+ * the same shape (score_breakdown out of each criterion's own max), so both
+ * kinds of work land on one leaderboard on one scale.
+ *
+ * Also different from the contributor's version: a partial breakdown is
+ * allowed. Theirs refused to save unless all four criteria were filled, which
+ * meant a reviewer with a note on one criterion could not save the review at
+ * all. Here a total can be entered directly, derived from the parts, or left
+ * off entirely for a review with comments and no score.
+ */
 export async function reviewCaseFile(formData: FormData) {
   const { db, me: admin } = await guardReviewer();
-  await db.from('case_file_submissions').update({
+  const submissionId = String(formData.get('id'));
+
+  const { data: existingCase } = await db
+    .from('case_file_submissions')
+    .select('id, user_id, review_photos')
+    .eq('id', submissionId)
+    .maybeSingle();
+  if (!existingCase) throw new Error('case not found');
+
+  /*
+   * REVIEWER PHOTOS go to the private `case-files` bucket and are stored as
+   * paths, never public URLs; students see them through short-lived signed
+   * links. Validated server-side — the file input's `accept` attribute is a
+   * hint to the browser, not a check.
+   */
+  const existingPhotos = Array.isArray(existingCase.review_photos) ? (existingCase.review_photos as string[]) : [];
+  const uploadedPhotos: string[] = [];
+  for (const value of formData.getAll('review_photos')) {
+    if (!(value instanceof File) || value.size === 0) continue;
+    if (!value.type.startsWith('image/')) throw new Error('review photos must be images');
+    if (value.size > 10 * 1024 * 1024) throw new Error('review photos must be 10MB or smaller');
+    if (existingPhotos.length + uploadedPhotos.length >= 12) throw new Error('at most 12 photos per case');
+
+    const safeName = value.name.replace(/[^\w.\-]/g, '_').slice(-80);
+    const path = `reviews/${submissionId}/${Date.now()}-${uploadedPhotos.length}-${safeName}`;
+    const { error } = await db.storage.from('case-files').upload(path, value, {
+      contentType: value.type,
+      upsert: false
+    });
+    if (error) throw new Error(`review photo upload failed: ${error.message}`);
+    uploadedPhotos.push(path);
+  }
+
+  // Case review is always out of 100 — there is no per-task maximum here.
+  const { breakdown, notes, sum } = readGradingForm(formData);
+  const rawGrade = num(formData.get('grade'));
+  const grade = rawGrade === null ? sum : Number(rawGrade);
+  if (grade !== null && (!Number.isFinite(grade) || grade < 0 || grade > 100)) {
+    throw new Error('grade must be between 0 and 100');
+  }
+
+  const now = new Date().toISOString();
+  const { error: updateError } = await db.from('case_file_submissions').update({
     reviewer_notes: str(formData.get('reviewer_notes')),
     reviewed_by: admin.full_name || admin.email,
     status: 'reviewed',
-    reviewed_at: new Date().toISOString()
-  }).eq('id', String(formData.get('id')));
+    reviewed_at: now,
+    grade,
+    score_breakdown: breakdown,
+    criterion_notes: notes,
+    graded_by: grade === null ? null : admin.id,
+    graded_at: grade === null ? null : now,
+    publish_to_leaderboard: readPublish(formData),
+    review_photos: [...existingPhotos, ...uploadedPhotos]
+  }).eq('id', submissionId);
+
+  if (updateError) {
+    /*
+     * The photos are already in storage. Remove them rather than leave files
+     * no row points at — orphans in a private bucket are invisible, and they
+     * accumulate.
+     */
+    if (uploadedPhotos.length > 0) await db.storage.from('case-files').remove(uploadedPhotos);
+    throw new Error(`case review failed: ${updateError.message}`);
+  }
+
+  // Same WhatsApp flow as STL tasks. Only once a grade exists, and only after
+  // it is saved; never throws, so messaging trouble cannot fail a review.
+  if (grade !== null) {
+    const outcome = await notifyCaseGraded(db, {
+      submissionId,
+      studentId: existingCase.user_id,
+      grade,
+      maxScore: 100,
+      gradedAt: now
+    });
+    if (!outcome.sent) console.info('[case review] WhatsApp not sent:', outcome.reason);
+  }
+
   done();
 }
 

@@ -11,7 +11,8 @@ import {
 import CaseFileLink from '@/components/admin/CaseFileLink';
 import SubmitButton, { SubmitLink } from '@/components/SubmitButton';
 import NotificationLink from '@/components/admin/NotificationLink';
-import { CRITERIA, parseBreakdown } from '@/lib/scoring';
+import { parseBreakdown, parseNotes } from '@/lib/scoring';
+import GradingFields from '@/components/admin/GradingFields';
 import { Users, Wallet, ClipboardCheck, Coins } from 'lucide-react';
 import BunnyUpload from '@/components/admin/BunnyUpload';
 import { isBunnyConfigured, bunnyLibraryFrom } from '@/lib/bunny';
@@ -690,38 +691,17 @@ async function Tasks({
                     <Field label={`${labels.grade} / ${selectedAssignment.max_score}`} hint={ar ? 'اتركها فارغة ليُحسب المجموع من التفصيل أدناه.' : 'Leave blank to total the breakdown below.'}>
                       <input name="grade" type="number" min="0" max={Number(selectedAssignment.max_score)} step="0.5" defaultValue={selected.grade ?? ''} className="field" />
                     </Field>
-                    {/*
-                      * Per-criterion scoring. Every field is optional: a
-                      * reviewer who prefers one number just fills the total
-                      * above and leaves these blank. Fill them and leave the
-                      * total blank, and the server sums them.
-                      *
-                      * Each input is capped at its own criterion's max, so the
-                      * parts can never quietly exceed the whole.
-                      */}
+                    {/* Shared with case review — see components/admin/GradingFields. */}
                     <div className="sm:col-span-2">
                       <p className="label mb-3">
                         {ar ? 'تفصيل الدرجة (اختياري)' : 'Score breakdown (optional)'}
                       </p>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {CRITERIA.map((criterion) => (
-                          <Field
-                            key={criterion.id}
-                            label={`${ar ? criterion.ar : criterion.en} / ${criterion.max}`}
-                            hint={ar ? criterion.hintAr : criterion.hintEn}
-                          >
-                            <input
-                              name={`breakdown_${criterion.id}`}
-                              type="number"
-                              min="0"
-                              max={criterion.max}
-                              step="0.5"
-                              defaultValue={selectedBreakdown?.[criterion.id] ?? ''}
-                              className="field"
-                            />
-                          </Field>
-                        ))}
-                      </div>
+                      <GradingFields
+                        breakdown={selectedBreakdown}
+                        notes={parseNotes(selected.criterion_notes)}
+                        publish={selected.publish_to_leaderboard !== false}
+                        ar={ar}
+                      />
                     </div>
 
                     <div className="sm:col-span-2">
@@ -823,17 +803,64 @@ async function QC({ db, save, locale, caseId, t }: { db: DB; save: string; local
               </div>
             </div>
 
-            <form action={reviewCaseFile} className="mt-7 space-y-4">
+            {/* encType is required for the photo input: without multipart the
+                files are silently dropped and only the text fields arrive. */}
+            <form action={reviewCaseFile} encType="multipart/form-data" className="mt-7 space-y-6">
               <input type="hidden" name="id" value={selected.id} />
+
+              <Field
+                label={locale === 'ar' ? 'الدرجة النهائية / 100' : 'Overall grade / 100'}
+                hint={locale === 'ar'
+                  ? 'اتركها فارغة ليُحسب المجموع من التفصيل، أو فارغة تماماً لمراجعة بلا درجة.'
+                  : 'Leave blank to total the breakdown — or leave everything blank for a review with no score.'}
+              >
+                <input
+                  name="grade"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  defaultValue={selected.grade ?? ''}
+                  className="field"
+                />
+              </Field>
+
+              {/* The SAME component as STL task grading — one set of criteria,
+                  one scale, one leaderboard. */}
+              <GradingFields
+                breakdown={parseBreakdown(selected.score_breakdown)}
+                notes={parseNotes(selected.criterion_notes)}
+                publish={selected.publish_to_leaderboard !== false}
+                ar={locale === 'ar'}
+              />
+
               <Field label={t('feedback')} hint={t('feedbackHint')}>
                 <textarea
                   name="reviewer_notes"
-                  rows={9}
+                  rows={7}
                   defaultValue={selected.reviewer_notes ?? ''}
                   className="field"
                   placeholder={t('feedbackPlaceholder')}
                 />
               </Field>
+
+              <Field
+                label={locale === 'ar' ? 'صور توضيحية' : 'Review photos'}
+                hint={locale === 'ar'
+                  ? 'لقطات توضّح ملاحظاتك. صور فقط، حتى 10MB لكل صورة. يراها الطالب فقط.'
+                  : 'Screenshots that illustrate your notes. Images only, up to 10MB each. Visible to this student only.'}
+              >
+                <input name="review_photos" type="file" accept="image/*" multiple className="field text-sm" />
+              </Field>
+
+              {Array.isArray(selected.review_photos) && selected.review_photos.length > 0 && (
+                <p className="text-xs text-steel">
+                  {locale === 'ar'
+                    ? `${selected.review_photos.length} صورة مرفقة بالفعل — الصور الجديدة تُضاف إليها.`
+                    : `${selected.review_photos.length} photo(s) already attached — new ones are added alongside.`}
+                </p>
+              )}
+
               <SubmitButton>{save}</SubmitButton>
             </form>
 
