@@ -573,3 +573,38 @@ export async function setModuleOverride(formData: FormData) {
   if (error) throw new Error(`save override failed: ${error.message}`);
   done();
 }
+
+/**
+ * Marks every unread notification for the current reviewer as read.
+ *
+ * Scoped to `me.id` rather than taking a recipient from the form: a reviewer
+ * must not be able to clear somebody else's queue, and the RLS policy on the
+ * table enforces the same thing a second time.
+ */
+export async function markNotificationsRead() {
+  const { db, me } = await guardReviewer();
+  const { error } = await db
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('recipient_id', me.id)
+    .is('read_at', null);
+  if (error) throw new Error(`notifications update failed: ${error.message}`);
+  done();
+}
+
+/** Marks one notification read — used as a reviewer opens it. */
+export async function markNotificationRead(formData: FormData) {
+  const { db, me } = await guardReviewer();
+  const id = String(formData.get('id'));
+  if (!id) throw new Error('notification id is required');
+
+  const { error } = await db
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('id', id)
+    // Both clauses matter: the id alone would let a crafted request clear a
+    // notification belonging to another reviewer.
+    .eq('recipient_id', me.id);
+  if (error) throw new Error(`notification update failed: ${error.message}`);
+  done();
+}

@@ -10,6 +10,7 @@ import {
 } from '@/components/admin/Shell';
 import CaseFileLink from '@/components/admin/CaseFileLink';
 import SubmitButton, { SubmitLink } from '@/components/SubmitButton';
+import NotificationLink from '@/components/admin/NotificationLink';
 import { CRITERIA, parseBreakdown } from '@/lib/scoring';
 import { Users, Wallet, ClipboardCheck, Coins } from 'lucide-react';
 import BunnyUpload from '@/components/admin/BunnyUpload';
@@ -19,7 +20,8 @@ import {
   updateTier, saveModule, deleteModule, reviewCaseFile, updateRequest,
   grantProductionPartner, saveSession, deleteSession, saveCommunity, savePromo,
   deletePromo, saveSettings, updateStudent, recordManualPayment,
-  saveAssignment, deleteAssignment, reviewAssignmentSubmission, setModuleOverride
+  saveAssignment, deleteAssignment, reviewAssignmentSubmission, setModuleOverride,
+  markNotificationsRead
 } from './actions';
 
 export const metadata: Metadata = { robots: { index: false } };
@@ -60,6 +62,19 @@ export default async function Admin({
     .from('assignment_submissions')
     .select('*', { count: 'exact', head: true })
     .in('status', ['submitted', 'resubmitted', 'under_review']);
+  /*
+   * This reviewer's notifications, newest first. Capped at 12: the panel is a
+   * "what landed while I was away" list, not an archive, and an unbounded
+   * select here would grow with the life of the course.
+   */
+  const { data: notifications } = await db
+    .from('notifications')
+    .select('id, title, body, href, created_at, read_at')
+    .eq('recipient_id', me.id)
+    .order('created_at', { ascending: false })
+    .limit(12);
+  const unreadCount = (notifications ?? []).filter((n: any) => !n.read_at).length;
+
   const save = t('save');
   const crud = { save, add: t('add'), del: t('delete'), emptyModules: t('emptyModules'), emptyModulesBody: t('emptyModulesBody') };
 
@@ -71,6 +86,47 @@ export default async function Admin({
           {me.full_name || me.email} · {isReviewer ? t('roleReviewer') : t('roleAdmin')}
         </p>
       </div>
+
+      {(notifications ?? []).length > 0 && (
+        <section className="mb-8 border border-line bg-white">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
+            <h2 className="font-display text-sm font-bold">
+              Notifications
+              {unreadCount > 0 && (
+                <span className="figure ms-2 rounded-full bg-brass px-2 py-0.5 text-[0.7rem] text-white">
+                  {unreadCount}
+                </span>
+              )}
+            </h2>
+            {unreadCount > 0 && (
+              <form action={markNotificationsRead}>
+                <SubmitLink className="text-xs text-brass underline">Mark all read</SubmitLink>
+              </form>
+            )}
+          </div>
+
+          <ul className="divide-y divide-line">
+            {(notifications ?? []).map((notification: any) => (
+              <li key={notification.id} className={notification.read_at ? 'opacity-55' : ''}>
+                <NotificationLink id={notification.id} href={lh(locale, notification.href)}>
+                  <div className="px-5 py-3 transition hover:bg-paper">
+                    <p className="text-sm font-medium">
+                      {!notification.read_at && (
+                        <span aria-hidden className="me-2 inline-block h-1.5 w-1.5 rounded-full bg-brass align-middle" />
+                      )}
+                      {notification.title}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-steel">{notification.body}</p>
+                    <p className="figure mt-0.5 text-[0.7rem] text-steel/70">
+                      {new Date(notification.created_at).toLocaleString('en-GB')}
+                    </p>
+                  </div>
+                </NotificationLink>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="grid gap-10 lg:grid-cols-[13rem_1fr]">
         <Sidebar locale={locale} active={tab} labels={labels} groupLabels={groupLabels} allowed={allowed} pendingQC={pendingQCCount ?? 0} pendingTasks={pendingTaskCount ?? 0} />
