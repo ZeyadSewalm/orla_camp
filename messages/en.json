@@ -98,7 +98,10 @@
     "savePassword": "Save new password",
     "resetDone": "Password updated. Taking you to the course…",
     "errShort": "Password must be at least 8 characters.",
-    "errMismatch": "The two passwords don't match."
+    "errMismatch": "The two passwords don't match.",
+    "phone": "Mobile number (WhatsApp)",
+    "phoneHint": "Egyptian mobile. We use it for course reminders and to tell you when your case is graded.",
+    "errPhone": "Enter a valid Egyptian mobile number, for example 010 1234 5678."
   },
   "checkout": {
     "title": "Complete your enrolment",

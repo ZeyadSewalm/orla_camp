@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
 import type { Region } from '@/lib/types';
 import { lh } from '@/lib/href';
+import { normaliseEgyptianMobile } from '@/lib/phone';
 
 export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; locale: string }) {
   const t = useTranslations('auth');
@@ -18,6 +19,7 @@ export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; l
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [region, setRegion] = useState<Region>('egypt');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +58,20 @@ export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; l
       return;
     }
 
+    /*
+     * The mobile number is required at signup: course reminders and grade
+     * notifications go out on WhatsApp, and a student with no number on file
+     * silently misses all of them. Validated here, in the same shape the
+     * server stores (lib/phone.ts and the SQL twin in migration 023 agree on
+     * every case), so a typo is caught while the student is still looking at
+     * the field rather than turning into a NULL they never hear about.
+     */
+    const normalisedPhone = mode === 'signup' ? normaliseEgyptianMobile(phone) : null;
+    if (mode === 'signup' && !normalisedPhone) {
+      setError(t('errPhone'));
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
@@ -64,7 +80,7 @@ export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; l
           email: cleanEmail,
           password,
           options: {
-            data: { full_name: fullName.trim(), region },
+            data: { full_name: fullName.trim(), region, phone: normalisedPhone },
             // lh() keeps Arabic unprefixed; a hard-coded `/${locale}/login`
             // sent Arabic users to "/ar/login", which does not exist.
             emailRedirectTo: `${siteOrigin()}${lh(locale, '/login')}`
@@ -103,6 +119,24 @@ export default function AuthForm({ mode, locale }: { mode: 'login' | 'signup'; l
         <div>
           <label className="label" htmlFor="name">{t('fullName')}</label>
           <input id="name" className="field" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        </div>
+      )}
+
+      {mode === 'signup' && (
+        <div>
+          <label className="label" htmlFor="phone">{t('phone')}</label>
+          <input
+            id="phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            dir="ltr"
+            placeholder="010 1234 5678"
+            className="field"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+          <p className="mt-1.5 text-xs text-steel">{t('phoneHint')}</p>
         </div>
       )}
 

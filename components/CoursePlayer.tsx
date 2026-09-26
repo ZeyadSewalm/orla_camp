@@ -22,7 +22,6 @@ import { createClient } from '@/lib/supabase/client';
 import { lh } from '@/lib/href';
 import VideoEmbed from '@/components/VideoEmbed';
 import ForensicWatermark from '@/components/ForensicWatermark';
-import UploadCaseFile from '@/components/UploadCaseFile';
 import AssignmentTask from '@/components/AssignmentTask';
 import type { Assignment, AssignmentSubmission } from '@/lib/types';
 
@@ -422,7 +421,11 @@ export default function CoursePlayer({
                       {t('checklist')}
                     </a>
                   )}
-                  <UploadCaseFile moduleId={active.id} userId={userId} />
+                  {/* The "Upload your case file for review" button (Supabase
+                      Storage → Case review) was removed: students hand in work
+                      only through the lesson's task below, which uploads to
+                      Drive. One way in means one queue to watch. Case review
+                      still holds and grades everything submitted before. */}
                   <button
                     type="button"
                     disabled={busyId === active.id}

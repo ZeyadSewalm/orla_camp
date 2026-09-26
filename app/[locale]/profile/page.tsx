@@ -7,6 +7,7 @@ import { lh } from '@/lib/href';
 import { CRITERIA, parseBreakdown, parseNotes, toPercent } from '@/lib/scoring';
 import { signedReviewPhotos } from '@/lib/case-files';
 import LeaderboardVisibility from '@/components/LeaderboardVisibility';
+import ProfileInfoForm from '@/components/ProfileInfoForm';
 import StudentDashboard from '@/components/StudentDashboard';
 import { getStudentOverview } from '@/lib/student-overview';
 
@@ -26,7 +27,13 @@ export const dynamic = 'force-dynamic';
  * The one genuinely new column is `profiles.show_on_leaderboard`, and that
  * exists so a student can decline to be ranked.
  */
-export default async function Profile({ params: { locale } }: { params: { locale: string } }) {
+export default async function Profile({
+  params: { locale },
+  searchParams
+}: {
+  params: { locale: string };
+  searchParams: { complete?: string; next?: string };
+}) {
   unstable_setRequestLocale(locale);
   const ar = locale === 'ar';
   const t = await getTranslations('profile');
@@ -193,6 +200,35 @@ export default async function Profile({ params: { locale } }: { params: { locale
       {/* The welcome banner, at-a-glance stats, recent activity and STL task
           grid. Rendered only when the overview loaded — a failed fetch should
           cost the banner, not the whole profile. */}
+      {/*
+        * MISSING NUMBER — sent here by the middleware.
+        *
+        * The form comes FIRST and alone, above the dashboard: the student was
+        * redirected for exactly this, and burying it under the welcome banner
+        * would look like the redirect had failed. `next` returns them to the
+        * page they were heading for.
+        */}
+      {!me.phone && (
+        <section className="mb-10 rounded-2xl border-2 border-brass bg-white p-6 md:p-8">
+          <h1 className="font-display text-2xl font-black">
+            {ar ? 'أضف رقم موبايلك للمتابعة' : 'Add your mobile number to continue'}
+          </h1>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-steel">
+            {ar
+              ? 'نرسل تذكيرات الكورس وإشعار تقييم حالاتك على واتساب. يستغرق هذا ثوانٍ.'
+              : 'Course reminders and grade notifications go out on WhatsApp. This takes a few seconds.'}
+          </p>
+          <div className="mt-6 max-w-md">
+            <ProfileInfoForm fullName={me.full_name ?? ''} email={me.email ?? ''} phone={null} ar={ar} required />
+          </div>
+          {searchParams.next && searchParams.next.startsWith('/') && (
+            <a href={searchParams.next} className="mt-4 inline-block text-sm text-brass underline">
+              {ar ? 'بعد الحفظ: المتابعة إلى حيث كنت' : 'After saving: continue where you were going'}
+            </a>
+          )}
+        </section>
+      )}
+
       {overview && (
         <StudentDashboard
           locale={locale}
@@ -357,6 +393,15 @@ export default async function Profile({ params: { locale } }: { params: { locale
           </ol>
         )}
       </section>
+
+      {me.phone && (
+        <section className="surface-card mt-10 p-6 md:p-8">
+          <h2 className="font-display text-lg font-black">{ar ? 'بياناتي' : 'My details'}</h2>
+          <div className="mt-5 max-w-md">
+            <ProfileInfoForm fullName={me.full_name ?? ''} email={me.email ?? ''} phone={me.phone} ar={ar} />
+          </div>
+        </section>
+      )}
     </div>
   );
 }

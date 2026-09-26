@@ -454,7 +454,38 @@ async function Tasks({
   // only the first group can be reviewed, only the second explains a task that
   // refuses to delete.
   const rows = allRows.filter((row: any) => !['uploading', 'failed'].includes(row.status));
-  const stuck = allRows.filter((row: any) => ['uploading', 'failed'].includes(row.status));
+  /*
+   * STUDENTS WHO ARE ACTUALLY STUCK — not every attempt that ever failed.
+   *
+   * Every new upload attempt marks the student's earlier unfinished attempts
+   * as 'failed', so a student who fails three times and then succeeds leaves
+   * three 'failed' rows behind. Listing all of them buried the submission
+   * queue under a wall of history about problems already solved — eighteen
+   * rows for what was really one student, now fine.
+   *
+   * So: at most one line per student per task, only when they have NOT since
+   * submitted it successfully, and not an upload that began in the last 15
+   * minutes (that one may simply still be running).
+   *
+   * Deliberately NO age cut-off. The students stuck longest are the ones who
+   * hit a broken uploader weeks ago and gave up — exactly the people who need
+   * to be told it works now. An age filter would hide them first.
+   */
+  const IN_PROGRESS_MS = 15 * 60 * 1000;
+  const now = Date.now();
+  const succeeded = new Set(rows.map((row: any) => `${row.user_id}:${row.assignment_id}`));
+  const stuckByKey = new Map<string, any>();
+  for (const row of allRows) {
+    if (!['uploading', 'failed'].includes(row.status)) continue;
+    const key = `${row.user_id}:${row.assignment_id}`;
+    if (succeeded.has(key)) continue;
+    const age = now - new Date(row.updated_at).getTime();
+    if (row.status === 'uploading' && age < IN_PROGRESS_MS) continue;
+    // allRows is newest first, so the first row seen per key is the latest.
+    if (!stuckByKey.has(key)) stuckByKey.set(key, { ...row, attempts: 1 });
+    else stuckByKey.get(key).attempts += 1;
+  }
+  const stuck = [...stuckByKey.values()];
   const pending = rows.filter((row: any) => ['submitted', 'resubmitted', 'under_review'].includes(row.status));
   const selected = rows.find((row: any) => row.id === submissionId) ?? pending[pending.length - 1] ?? rows[0] ?? null;
   const selectedAssignment = selected ? assignmentById.get(selected.assignment_id) : null;
@@ -507,7 +538,17 @@ async function Tasks({
       <Field label={labels.titleEn}><input name="title_en" defaultValue={assignment?.title_en ?? ''} className="field" required /></Field>
       <Field label={labels.descAr}><textarea name="description_ar" rows={2} defaultValue={assignment?.description_ar ?? ''} className="field" /></Field>
       <Field label={labels.descEn}><textarea name="description_en" rows={2} defaultValue={assignment?.description_en ?? ''} className="field" /></Field>
-      <Field label={labels.types} hint=".stl, .ply"><input name="allowed_file_types" defaultValue={(assignment?.allowed_file_types ?? ['.stl']).join(', ')} className="field" /></Field>
+      <Field
+          label={labels.types}
+          hint={ar ? 'اتركها فارغة لقبول أي نوع ملف. أو حدّد: .stl, .ply, .pdf' : 'Leave blank to accept any file type. Or restrict: .stl, .ply, .pdf'}
+        >
+          <input
+            name="allowed_file_types"
+            defaultValue={(assignment?.allowed_file_types ?? []).join(', ')}
+            placeholder={ar ? 'أي نوع' : 'any type'}
+            className="field"
+          />
+        </Field>
       <Field label={labels.maxSize} hint={ar ? 'اتركه فارغًا لاستخدام حد النظام.' : 'Leave blank to use the system limit.'}><input name="max_file_size_mb" type="number" min="1" defaultValue={assignment?.max_file_size_mb ?? ''} className="field" /></Field>
       <Field label={labels.due}><input name="due_date" type="datetime-local" defaultValue={inputDate(assignment?.due_date ?? null)} className="field" /></Field>
       <div className="flex flex-wrap items-end gap-5 pb-2 text-sm">
@@ -558,12 +599,15 @@ async function Tasks({
         </details>
       )}
 
+      {/* Collapsed by default: it is a side note to the queue, not the queue.
+          Even a handful of lines here used to push the actual submissions
+          below the fold. */}
       {stuck.length > 0 && (
-        <div className="border border-amber-300 bg-amber-50 px-5 py-4">
-          <p className="font-display text-sm font-bold text-amber-900">
+        <details className="border border-amber-300 bg-amber-50 px-5 py-4">
+          <summary className="cursor-pointer font-display text-sm font-bold text-amber-900">
             {labels.stuckTitle} <span className="figure">({stuck.length})</span>
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-amber-900/80">{labels.stuckBody}</p>
+          </summary>
+          <p className="mt-2 text-xs leading-relaxed text-amber-900/80">{labels.stuckBody}</p>
           <ul className="mt-3 space-y-1.5">
             {stuck.map((row: any) => {
               const profile = profileById.get(row.user_id);
@@ -583,11 +627,14 @@ async function Tasks({
                   </span>
                   <span className="opacity-60">·</span>
                   <span className="figure opacity-70">{localDateTime(row.updated_at)}</span>
+                  {row.attempts > 1 && (
+                    <span className="opacity-70">· {ar ? `${row.attempts} محاولات` : `${row.attempts} attempts`}</span>
+                  )}
                 </li>
               );
             })}
           </ul>
-        </div>
+        </details>
       )}
 
       <div>

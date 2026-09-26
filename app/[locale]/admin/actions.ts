@@ -202,12 +202,15 @@ export async function deleteModule(formData: FormData) {
 export async function saveAssignment(formData: FormData) {
   const { db } = await guard();
   const id = str(formData.get('id'));
-  const rawTypes = String(formData.get('allowed_file_types') || '.stl')
+  // Blank = any file type (executables are always refused by the upload route).
+  const rawTypes = String(formData.get('allowed_file_types') || '')
     .split(',')
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean)
     .map((value) => value.startsWith('.') ? value : `.${value}`);
-  const allowed = Array.from(new Set(rawTypes.length ? rawTypes : ['.stl']));
+  // No fallback to ['.stl']: an empty list IS the "any file" setting, and
+  // substituting STL here would quietly re-restrict every task saved blank.
+  const allowed = Array.from(new Set(rawTypes));
   const maxScore = num(formData.get('max_score')) ?? 100;
   if (!Number.isFinite(maxScore) || maxScore <= 0) throw new Error('invalid max score');
 

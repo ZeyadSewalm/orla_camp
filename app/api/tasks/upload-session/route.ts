@@ -20,6 +20,13 @@ type Payload = {
   contentType?: string;
 };
 
+const BLOCKED_EXTENSIONS = new Set([
+  '.exe', '.msi', '.bat', '.cmd', '.com', '.scr', '.pif', '.cpl',
+  '.ps1', '.psm1', '.vbs', '.vbe', '.js', '.jse', '.wsf', '.wsh', '.hta',
+  '.jar', '.apk', '.app', '.dmg', '.pkg', '.deb', '.rpm', '.sh', '.bash',
+  '.dll', '.sys', '.lnk', '.reg', '.iso'
+]);
+
 function extensionOf(filename: string) {
   const match = filename.toLowerCase().match(/(\.[a-z0-9]+)$/i);
   return match?.[1] ?? '';
@@ -98,12 +105,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'lesson_unavailable' }, { status: 403 });
     }
 
-    const allowed = ((assignment.allowed_file_types as string[] | null) ?? ['.stl'])
+    const allowed = ((assignment.allowed_file_types as string[] | null) ?? [])
       .map((x) => String(x).trim().toLowerCase())
       .filter(Boolean)
       .map((x) => x.startsWith('.') ? x : `.${x}`);
     const ext = extensionOf(originalFilename);
-    if (!ext || !allowed.includes(ext)) {
+
+    /*
+     * An empty list means ANY file type (migration 023) — scans, photos, PDFs,
+     * archives, whatever the case needs. A task can still be narrowed by
+     * listing extensions in Task setup.
+     *
+     * Executables are refused whatever a task says. These files end up in a
+     * reviewer's Drive and get opened on a reviewer's machine; "any file" was
+     * meant to cover dental work, not to turn the upload into a way to hand
+     * staff a program to run.
+     */
+    if (BLOCKED_EXTENSIONS.has(ext)) {
+      return NextResponse.json({ error: 'file_type_not_allowed', allowed }, { status: 400 });
+    }
+    if (allowed.length > 0 && !allowed.includes(ext)) {
       return NextResponse.json({ error: 'file_type_not_allowed', allowed }, { status: 400 });
     }
 

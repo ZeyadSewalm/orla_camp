@@ -28,7 +28,9 @@ function statusLabel(status: AssignmentSubmission['status'], ar: boolean) {
   return map[status];
 }
 
+/** Empty list = any file type, so the picker shows everything. */
 function accepted(allowed: string[]) {
+  if (!allowed || allowed.length === 0) return undefined;
   return allowed.map((x) => x.startsWith('.') ? x : `.${x}`).join(',');
 }
 
@@ -310,7 +312,10 @@ export default function AssignmentTask({
           <h4 className="mt-3 font-display text-base font-black text-ink sm:text-lg">{title}</h4>
           {description && <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-steel">{description}</p>}
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-steel">
-            <span>{ar ? 'الملفات:' : 'Files:'} {assignment.allowed_file_types.join(', ')}</span>
+            <span>{ar ? 'الملفات:' : 'Files:'}{' '}
+              {assignment.allowed_file_types?.length
+                ? assignment.allowed_file_types.join(', ')
+                : (ar ? 'أي نوع' : 'any type')}</span>
             <span>{ar ? 'الدرجة:' : 'Score:'} {assignment.max_score}</span>
             {assignment.max_file_size_mb && <span>{ar ? 'الحد الأقصى:' : 'Max:'} {assignment.max_file_size_mb} MB</span>}
             {due && <span>{ar ? 'الموعد:' : 'Due:'} {due}</span>}

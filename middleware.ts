@@ -146,7 +146,7 @@ export async function middleware(request: NextRequest) {
    *                        or /course because an auth check happened to error.
    */
   let user: { id: string } | null = null;
-  let profile: { has_access: boolean | null; role: string | null; last_login_at: string | null } | null = null;
+  let profile: { has_access: boolean | null; role: string | null; last_login_at: string | null; phone: string | null } | null = null;
 
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -173,7 +173,7 @@ export async function middleware(request: NextRequest) {
     if (isProtected && user) {
       const { data: row } = await supabase
         .from('profiles')
-        .select('has_access, role, last_login_at')
+        .select('has_access, role, last_login_at, phone')
         .eq('id', user.id)
         .single();
       profile = row;
