@@ -10,7 +10,7 @@ import {
 } from '@/components/admin/Shell';
 import CaseFileLink from '@/components/admin/CaseFileLink';
 import SubmitButton, { SubmitLink } from '@/components/SubmitButton';
-import NotificationLink from '@/components/admin/NotificationLink';
+import NotificationBell from '@/components/admin/NotificationBell';
 import { parseBreakdown, parseNotes } from '@/lib/scoring';
 import GradingFields from '@/components/admin/GradingFields';
 import { Users, Wallet, ClipboardCheck, Coins } from 'lucide-react';
@@ -21,8 +21,7 @@ import {
   updateTier, saveModule, deleteModule, reviewCaseFile, updateRequest,
   grantProductionPartner, saveSession, deleteSession, saveCommunity, savePromo,
   deletePromo, saveSettings, updateStudent, recordManualPayment,
-  saveAssignment, deleteAssignment, reviewAssignmentSubmission, setModuleOverride,
-  markNotificationsRead
+  saveAssignment, deleteAssignment, reviewAssignmentSubmission, setModuleOverride
 } from './actions';
 
 export const metadata: Metadata = { robots: { index: false } };
@@ -74,60 +73,31 @@ export default async function Admin({
     .eq('recipient_id', me.id)
     .order('created_at', { ascending: false })
     .limit(12);
-  const unreadCount = (notifications ?? []).filter((n: any) => !n.read_at).length;
 
   const save = t('save');
   const crud = { save, add: t('add'), del: t('delete'), emptyModules: t('emptyModules'), emptyModulesBody: t('emptyModulesBody') };
 
   return (
     <div className="mx-auto max-w-content px-5 py-10">
-      <div className="mb-8 flex flex-wrap items-baseline justify-between gap-3">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
         <h1 className="display text-3xl">{t('title')}</h1>
-        <p className="text-sm text-steel">
-          {me.full_name || me.email} · {isReviewer ? t('roleReviewer') : t('roleAdmin')}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-steel">
+            {me.full_name || me.email} · {isReviewer ? t('roleReviewer') : t('roleAdmin')}
+          </p>
+          <NotificationBell
+            locale={locale}
+            items={(notifications ?? []).map((n: any) => ({
+              id: n.id,
+              title: n.title,
+              body: n.body,
+              href: lh(locale, n.href),
+              created_at: n.created_at,
+              read_at: n.read_at
+            }))}
+          />
+        </div>
       </div>
-
-      {(notifications ?? []).length > 0 && (
-        <section className="mb-8 border border-line bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
-            <h2 className="font-display text-sm font-bold">
-              Notifications
-              {unreadCount > 0 && (
-                <span className="figure ms-2 rounded-full bg-brass px-2 py-0.5 text-[0.7rem] text-white">
-                  {unreadCount}
-                </span>
-              )}
-            </h2>
-            {unreadCount > 0 && (
-              <form action={markNotificationsRead}>
-                <SubmitLink className="text-xs text-brass underline">Mark all read</SubmitLink>
-              </form>
-            )}
-          </div>
-
-          <ul className="divide-y divide-line">
-            {(notifications ?? []).map((notification: any) => (
-              <li key={notification.id} className={notification.read_at ? 'opacity-55' : ''}>
-                <NotificationLink id={notification.id} href={lh(locale, notification.href)}>
-                  <div className="px-5 py-3 transition hover:bg-paper">
-                    <p className="text-sm font-medium">
-                      {!notification.read_at && (
-                        <span aria-hidden className="me-2 inline-block h-1.5 w-1.5 rounded-full bg-brass align-middle" />
-                      )}
-                      {notification.title}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-steel">{notification.body}</p>
-                    <p className="figure mt-0.5 text-[0.7rem] text-steel/70">
-                      {new Date(notification.created_at).toLocaleString('en-GB')}
-                    </p>
-                  </div>
-                </NotificationLink>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       <div className="grid gap-10 lg:grid-cols-[13rem_1fr]">
         <Sidebar locale={locale} active={tab} labels={labels} groupLabels={groupLabels} allowed={allowed} pendingQC={pendingQCCount ?? 0} pendingTasks={pendingTaskCount ?? 0} />
@@ -723,11 +693,35 @@ async function Tasks({
 
 /* --------------------------------------------------------------------- QC */
 async function QC({ db, save, locale, caseId, t }: { db: DB; save: string; locale: string; caseId?: string; t: any }) {
-  const { data: rows } = await db
+  /*
+   * `profiles!user_id(...)`, NOT `profiles(...)`.
+   *
+   * Migration 020 added `graded_by`, a second foreign key from this table to
+   * profiles. With two, a bare `profiles(...)` embed is ambiguous — the student
+   * who uploaded, or the reviewer who graded? — and PostgREST refuses the whole
+   * query (PGRST201) rather than guess. The hint names the relationship: the
+   * student, through user_id.
+   */
+  const { data: rows, error: rowsError } = await db
     .from('case_file_submissions')
-    .select('*, profiles(email, full_name), course_modules(title_en)')
+    .select('*, profiles!user_id(email, full_name), course_modules(title_en)')
     .order('status', { ascending: true })
     .order('submitted_at', { ascending: false });
+
+  /*
+   * A failed query used to fall through to `rows ?? []` and render the empty
+   * state — "Nothing waiting for review" — while five cases sat in the table.
+   * An error is not an empty queue, and the screen must not say it is.
+   */
+  if (rowsError) {
+    console.error('[admin/qc] case query failed:', rowsError.message);
+    return (
+      <div className="border border-red-300 bg-red-50 p-5 text-sm text-red-800">
+        <p className="font-semibold">Case review could not load.</p>
+        <p className="mt-1 font-mono text-xs">{rowsError.message}</p>
+      </div>
+    );
+  }
 
   const list = rows ?? [];
   const pending = list.filter((x) => x.status === 'pending');
