@@ -32,22 +32,43 @@ function accepted(allowed: string[]) {
   return allowed.map((x) => x.startsWith('.') ? x : `.${x}`).join(',');
 }
 
-async function queryUploadedOffset(sessionUrl: string, total: number) {
+/*
+ * THE BROWSER NO LONGER TALKS TO DRIVE.
+ *
+ * Every byte used to go straight from here to the Drive resumable session.
+ * That session is opened server-side with no Origin, and Google rejects
+ * cross-origin browser requests to a session opened that way — at the CORS
+ * layer, which fetch() reports as a bare network error. Students saw "the
+ * connection dropped" on a connection that was fine.
+ *
+ * Chunks now go to /api/tasks/upload-chunk on this site, which forwards them
+ * to Drive server-to-server. The resume logic is unchanged; only the address
+ * each request is sent to moved.
+ */
+const CHUNK_ROUTE = '/api/tasks/upload-chunk';
+
+type ChunkReply =
+  | { status: 308; nextOffset: number }
+  | { status: 200; fileId: string | null }
+  | { error: string; status?: number };
+
+async function sendChunk(submissionId: string, range: string, body: Blob) {
+  const response = await fetch(`${CHUNK_ROUTE}?submissionId=${encodeURIComponent(submissionId)}`, {
+    method: 'POST',
+    headers: { 'x-content-range': range, 'Content-Type': 'application/octet-stream' },
+    body
+  });
+  const data = (await response.json().catch(() => ({ error: 'bad_reply' }))) as ChunkReply;
+  return { httpStatus: response.status, data };
+}
+
+/** Asks Drive, via the proxy, how much of the file it already holds. */
+async function queryUploadedOffset(submissionId: string, total: number) {
   try {
-    const response = await fetch(sessionUrl, {
-      method: 'PUT',
-      headers: { 'Content-Range': `bytes */${total}` },
-      body: new Blob([])
-    });
-    if (response.ok) {
-      const data = await response.json().catch(() => null) as { id?: string } | null;
-      return { offset: total, fileId: data?.id ?? null };
-    }
-    if (response.status !== 308) return null;
-    const range = response.headers.get('Range') || response.headers.get('range');
-    if (!range) return { offset: 0, fileId: null };
-    const match = range.match(/bytes=0-(\d+)/i);
-    return { offset: match ? Number(match[1]) + 1 : 0, fileId: null };
+    const { data } = await sendChunk(submissionId, `bytes */${total}`, new Blob([]));
+    if ('status' in data && data.status === 200) return { offset: total, fileId: (data as { fileId: string | null }).fileId };
+    if ('status' in data && data.status === 308) return { offset: (data as { nextOffset: number }).nextOffset, fileId: null };
+    return null;
   } catch {
     return null;
   }
@@ -55,16 +76,18 @@ async function queryUploadedOffset(sessionUrl: string, total: number) {
 
 async function uploadInChunks(args: {
   file: File;
-  sessionUrl: string;
+  submissionId: string;
   chunkSize: number;
   onProgress: (value: number) => void;
 }) {
-  const { file, sessionUrl } = args;
-  // Google requires non-final chunks to be a multiple of 256 KiB. 8 MiB is
-  // large enough to be efficient and small enough that a retry is cheap.
-  const chunkSize = Math.max(256 * 1024, Math.floor(args.chunkSize / (256 * 1024)) * 256 * 1024);
+  const { file, submissionId } = args;
+  // Drive requires non-final chunks to be a multiple of 256 KiB, and the proxy
+  // hop caps a request at 4 MiB. Clamp to both, whatever the server suggested.
+  const quantum = 256 * 1024;
+  const ceiling = 4 * 1024 * 1024;
+  const chunkSize = Math.max(quantum, Math.min(ceiling, Math.floor(args.chunkSize / quantum) * quantum));
   let start = 0;
-  let lastMetadata: { id?: string } | null = null;
+  let fileId: string | null = null;
 
   while (start < file.size) {
     const end = Math.min(start + chunkSize, file.size);
@@ -75,45 +98,40 @@ async function uploadInChunks(args: {
     while (!completed && attempts < 4) {
       attempts += 1;
       try {
-        const response = await fetch(sessionUrl, {
-          method: 'PUT',
-          headers: { 'Content-Range': `bytes ${start}-${end - 1}/${file.size}` },
-          body: chunk
-        });
+        const { httpStatus, data } = await sendChunk(submissionId, `bytes ${start}-${end - 1}/${file.size}`, chunk);
 
-        if (response.status === 308) {
-          const range = response.headers.get('Range') || response.headers.get('range');
-          const match = range?.match(/bytes=0-(\d+)/i);
-          start = match ? Number(match[1]) + 1 : end;
+        if ('status' in data && data.status === 308) {
+          // Trust Drive's own account of what it holds, not our arithmetic.
+          start = (data as { nextOffset: number }).nextOffset || end;
           completed = true;
           args.onProgress(Math.min(99, Math.round((start / file.size) * 100)));
           continue;
         }
-
-        if (response.ok) {
-          lastMetadata = await response.json().catch(() => null) as { id?: string } | null;
+        if ('status' in data && data.status === 200) {
+          fileId = (data as { fileId: string | null }).fileId;
           start = file.size;
           completed = true;
           args.onProgress(100);
           continue;
         }
 
-        if (response.status >= 500 || response.status === 429) throw new Error('retryable');
-        throw new Error(`upload_${response.status}`);
+        // 503 from the proxy = Drive unreachable or busy: worth retrying.
+        // Anything else (the session expired, the row is no longer uploading)
+        // will not fix itself on a retry.
+        if (httpStatus === 503) throw new Error('retryable');
+        throw Object.assign(new Error(`upload_${(data as { error?: string }).error ?? httpStatus}`), { final: true });
       } catch (error) {
-        if (attempts >= 4) throw error;
-        const status = await queryUploadedOffset(sessionUrl, file.size);
+        if ((error as { final?: boolean }).final || attempts >= 4) throw error;
+        const status = await queryUploadedOffset(submissionId, file.size);
         if (status) {
           if (status.fileId) {
-            lastMetadata = { id: status.fileId };
+            fileId = status.fileId;
             start = file.size;
             completed = true;
             args.onProgress(100);
           } else {
             const previousStart = start;
             start = Math.max(0, status.offset);
-            // If Drive accepted any bytes, leave the inner retry loop so the
-            // outer loop can slice a fresh chunk from the confirmed offset.
             if (start !== previousStart || start >= end) completed = true;
             args.onProgress(Math.min(99, Math.round((start / file.size) * 100)));
           }
@@ -121,12 +139,13 @@ async function uploadInChunks(args: {
         if (!completed) await new Promise((resolve) => setTimeout(resolve, 600 * attempts));
       }
     }
+    if (!completed) throw new Error('upload_stalled');
   }
 
-  // The final Google response can be lost even after the file is committed.
-  // In that case the server can recover the Drive file by the submission id
-  // stored in appProperties, so a missing id here is not treated as failure.
-  return lastMetadata?.id ?? null;
+  // The final reply can be lost after Drive has committed the file. The server
+  // recovers it from the submission id stored in appProperties, so a missing
+  // id here is not a failure.
+  return fileId;
 }
 
 export default function AssignmentTask({
@@ -180,8 +199,8 @@ export default function AssignmentTask({
       setState('uploading');
       const driveFileId = await uploadInChunks({
         file,
-        sessionUrl: beginData.sessionUrl,
-        chunkSize: Number(beginData.chunkSize) || 8 * 1024 * 1024,
+        submissionId: beginData.submissionId,
+        chunkSize: Number(beginData.chunkSize) || 4 * 1024 * 1024,
         onProgress: setProgress
       });
 
@@ -239,12 +258,34 @@ export default function AssignmentTask({
       // connection. Shown raw it tells a dental student nothing at all.
       const raw = err instanceof Error ? err.message : '';
       const isNetwork = /failed to fetch|networkerror|load failed/i.test(raw);
+      /*
+       * Say what actually happened. Every failure used to read "the connection
+       * dropped", including ones the connection had nothing to do with — which
+       * is exactly how a server-side Drive problem hid behind a message telling
+       * students to check their wifi.
+       */
+      const expired = /upload_not_uploading|upload_drive_rejected/.test(raw);
+      const stalled = /upload_stalled|retryable/.test(raw);
       setError(
         isNetwork
           ? (ar
               ? 'انقطع الاتصال أثناء الرفع. تحقّق من الإنترنت واضغط رفع مرة أخرى.'
               : 'The connection dropped during upload. Check your internet and press upload again.')
-          : raw || (ar ? 'حدث خطأ أثناء الرفع.' : 'Upload failed.')
+          : expired
+            ? (ar
+                ? 'انتهت صلاحية جلسة الرفع. اضغط رفع لتبدأ من جديد.'
+                : 'The upload session expired. Press upload to start again.')
+            : stalled
+              ? (ar
+                  ? 'تعذّر الوصول إلى Google Drive الآن. انتظر دقيقة ثم اضغط رفع مرة أخرى.'
+                  : "Google Drive isn't responding right now. Wait a minute and press upload again.")
+              // Messages thrown earlier in this function — wrong file type,
+              // file too large, already pending — are written for the student
+              // and must reach them verbatim. Only internal codes ("upload_…")
+              // are swapped for a generic line.
+              : raw && !raw.startsWith('upload_')
+                ? raw
+                : (ar ? 'حدث خطأ أثناء الرفع. حاول مرة أخرى.' : 'The upload failed. Please try again.')
       );
     } finally {
       if (inputRef.current) inputRef.current.value = '';

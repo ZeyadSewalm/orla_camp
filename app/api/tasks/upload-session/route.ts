@@ -196,11 +196,22 @@ export async function POST(request: Request) {
           .eq('id', assignmentId);
       }
 
+      /*
+       * The session URL stays on the server. The browser uploads through
+       * /api/tasks/upload-chunk, which reads it from this row — see that route
+       * and migration 021 for why the browser no longer talks to Drive direct.
+       */
+      const { error: storeError } = await db.from('assignment_submissions')
+        .update({ upload_session_url: driveSession.sessionUrl })
+        .eq('id', created.id);
+      if (storeError) throw new Error(`could not store upload session: ${storeError.message}`);
+
       return NextResponse.json({
         submissionId: created.id,
-        sessionUrl: driveSession.sessionUrl,
         storedFilename,
-        chunkSize: 8 * 1024 * 1024
+        // 4 MiB: under Vercel's 4.5 MB request-body ceiling for the proxy hop,
+        // and a multiple of 256 KiB, which Drive requires of non-final chunks.
+        chunkSize: 4 * 1024 * 1024
       });
     } catch (error) {
       await db.from('assignment_submissions')

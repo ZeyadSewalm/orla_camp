@@ -133,6 +133,9 @@ export async function POST(request: Request) {
         drive_web_view_link: file.webViewLink ?? `https://drive.google.com/file/d/${encodeURIComponent(file.id)}/view`,
         status: finalStatus,
         submitted_at: now,
+        // The session is spent. Clearing it means the chunk proxy has nothing
+        // to forward to for this row, even if something asked it to.
+        upload_session_url: null,
         updated_at: now
       })
       .eq('id', submission.id)
